@@ -1,0 +1,38 @@
+{
+  "project_info": {
+    "project_number": "896703375462",
+    "project_id": "medtime-31405",
+    "storage_bucket": "medtime-31405.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:896703375462:android:cee72a21ccdedbcc2ca5a7",
+        "android_client_info": {
+          "package_name": "com.example.medtime"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "896703375462-ae4kkr33us3dk7hpnhcin7hhljnsms4m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.medtime",
+            "certificate_hash": "985891acb2b381e9ce804ee3a25256bb4c6ce783"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBh_ixOsMgLDwn9w_hmjaQkdagUJF109KM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
