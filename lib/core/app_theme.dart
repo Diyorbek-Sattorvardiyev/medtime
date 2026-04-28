@@ -19,11 +19,14 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.background,
       fontFamily: 'Inter',
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.surface,
         foregroundColor: AppColors.text,
-        centerTitle: false,
+        centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -87,11 +90,14 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.darkBackground,
       fontFamily: 'Inter',
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Color(0xFF172033),
         foregroundColor: Colors.white,
-        centerTitle: false,
+        centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

@@ -56,6 +56,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -67,7 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   onPressed: () => Navigator.of(
                     context,
                   ).pushReplacementNamed(AppRoutes.login),
-                  child: const Text("O'tkazib yuborish"),
+                  child: const Text("O'tkazish"),
                 ),
               ),
             ),
@@ -81,9 +82,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
               child: Row(
                 children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).pushReplacementNamed(AppRoutes.login),
+                    child: const Text("O'tkazish"),
+                  ),
                   const Spacer(),
                   Row(
                     children: List.generate(
@@ -103,7 +110,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   const Spacer(),
-                  TextButton(onPressed: _next, child: const Text('Keyingisi')),
+                  TextButton(onPressed: _next, child: const Text('Keyingi')),
                 ],
               ),
             ),
@@ -141,7 +148,16 @@ class _OnboardingPage extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
-          Expanded(flex: 6, child: Center(child: data.illustration)),
+          Expanded(
+            flex: 6,
+            child: Center(
+              child: SizedBox(
+                width: 210,
+                height: 190,
+                child: data.illustration,
+              ),
+            ),
+          ),
           Text(
             data.title,
             textAlign: TextAlign.center,

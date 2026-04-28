@@ -64,6 +64,7 @@ def medicine_dict(medicine, include_schedules=True, logs=None):
         "family_member_name": medicine.family_member.full_name if medicine.family_member else None,
         "name": medicine.name,
         "dosage": medicine.dosage,
+        "image_url": medicine.image_url,
         "intake_type": medicine.intake_type,
         "notes": medicine.notes,
         "stock_quantity": medicine.stock_quantity,

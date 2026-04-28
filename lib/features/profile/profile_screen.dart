@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,7 +10,6 @@ import '../../core/app_colors.dart';
 import '../../core/app_routes.dart';
 import '../../core/app_settings.dart';
 import '../../core/auth_api.dart';
-import '../../core/backup_service.dart';
 import '../../core/permission_service.dart';
 import '../../core/voice_service.dart';
 import '../../widgets/app_button.dart';
@@ -30,20 +32,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   var _loadingPermissions = true;
   var _loggingOut = false;
   var _loadingProfile = true;
-  var _quickStats = <String, dynamic>{
-    'taken_count': 0,
-    'missed_count': 0,
-    'pending_count': 0,
-  };
   String? _fullName;
   String? _email;
+  String? _avatarUrl;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
-    _loadQuickStats();
     _loadPermissionState();
   }
 
@@ -51,236 +48,144 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final settings = AppSettingsScope.of(context);
     final strings = AppStrings.of(context);
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 116),
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  strings.profile,
-                  style: Theme.of(context).textTheme.headlineLarge,
-                ),
-              ),
-              IconButton(
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRoutes.notifications),
-                icon: const Icon(Icons.settings_outlined),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          _ProfileCard(
-            fullName: _fullName ?? 'User Name',
-            email: _email ?? 'user@email.com',
-            loading: _loadingProfile,
-            error: _error,
-            onRetry: _loadProfile,
-            onEdit: _showEditProfile,
-          ),
-          const SizedBox(height: 18),
-          Text(
-            strings.quickStats,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _QuickStat(
-                  icon: Icons.check,
-                  color: AppColors.primary,
-                  title: 'Ichilgan\ndorilar',
-                  value: '${_statCount('taken')}',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _QuickStat(
-                  icon: Icons.close,
-                  color: AppColors.error,
-                  title: "O'tkazilgan",
-                  value: '${_statCount('missed')}',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _QuickStat(
-                  icon: Icons.schedule,
-                  color: AppColors.accent,
-                  title: 'Kutilmoqda',
-                  value: '${_statCount('pending')}',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            strings.notificationIntegration,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          _TelegramCard(
-            connected: _telegramConnected,
-            onConnect: _toggleTelegram,
-          ),
-          const SizedBox(height: 12),
-          _EmailCard(
-            enabled: _emailEnabled,
-            onChanged: (value) {
-              setState(() => _emailEnabled = value);
-              _saveNotificationSettings();
-            },
-          ),
-          const SizedBox(height: 12),
-          _PermissionCard(
-            loading: _loadingPermissions,
-            notificationsAllowed: _notificationsAllowed,
-            exactAlarmsAllowed: _exactAlarmsAllowed,
-            onRefresh: _loadPermissionState,
-            onRequestNotifications: _requestNotifications,
-            onRequestExactAlarms: _requestExactAlarms,
-            onOpenAppSettings: _openAppSettings,
-            onOpenBatterySettings: _openBatterySettings,
-          ),
-          const SizedBox(height: 18),
-          Text(
-            strings.settings,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          AppCard(
-            radius: 16,
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                _SettingTile(
-                  icon: Icons.dark_mode,
-                  iconColor: const Color(0xFF64748B),
-                  title: strings.darkMode,
-                  trailing: Switch(
-                    value: settings.darkMode,
-                    onChanged: (value) {
-                      settings.setDarkMode(value);
-                      _saveProfile(settings);
-                    },
-                  ),
-                ),
-                _SettingTile(
-                  icon: Icons.notifications,
-                  iconColor: AppColors.accent,
-                  title: strings.appNotification,
-                  trailing: Switch(
-                    value: _appNotifications,
-                    onChanged: (value) {
-                      setState(() => _appNotifications = value);
-                      _saveNotificationSettings();
-                    },
-                  ),
-                ),
-                _SettingTile(
-                  icon: Icons.alarm_on,
-                  iconColor: AppColors.primary,
-                  title: 'Eslatma ruxsatlari',
-                  onTap: () =>
-                      Navigator.pushNamed(context, AppRoutes.notifications),
-                ),
-                _SettingTile(
-                  icon: Icons.language,
-                  iconColor: AppColors.secondary,
-                  title: strings.languageText,
-                  trailing: DropdownButton<AppLanguage>(
-                    value: settings.language,
-                    underline: const SizedBox.shrink(),
-                    items: const [
-                      DropdownMenuItem(
-                        value: AppLanguage.uz,
-                        child: Text("O'zbek"),
-                      ),
-                      DropdownMenuItem(
-                        value: AppLanguage.en,
-                        child: Text('English'),
-                      ),
-                      DropdownMenuItem(
-                        value: AppLanguage.ru,
-                        child: Text('Русский'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      settings.setLanguage(value);
-                      _saveProfile(settings);
-                    },
-                  ),
-                ),
-                _SettingTile(
-                  icon: Icons.lock,
-                  iconColor: AppColors.mutedText,
-                  title: strings.security,
-                  trailing: const Text(
-                    'PIN / FaceID',
-                    style: TextStyle(fontSize: 13),
-                  ),
-                ),
-                _SettingTile(
-                  icon: Icons.auto_awesome,
-                  iconColor: AppColors.secondary,
-                  title: 'AI yordamchi',
-                  onTap: () =>
-                      Navigator.pushNamed(context, AppRoutes.aiAssistant),
-                ),
-                _SettingTile(
-                  icon: Icons.volume_up,
-                  iconColor: AppColors.accent,
-                  title: 'Voice reminder',
-                  onTap: _testVoiceReminder,
-                ),
-                _SettingTile(
-                  icon: Icons.backup_outlined,
-                  iconColor: AppColors.primary,
-                  title: 'Backup',
-                  onTap: _exportBackup,
-                ),
-                _SettingTile(
-                  icon: Icons.restore,
-                  iconColor: AppColors.secondary,
-                  title: 'Restore',
-                  onTap: _restoreBackup,
-                ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                const _FamilyAvatars(),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                _SettingTile(
-                  icon: Icons.help,
-                  iconColor: AppColors.secondary,
-                  title: strings.help,
-                ),
-                _SettingTile(
-                  icon: Icons.mail,
-                  iconColor: AppColors.mutedText,
-                  title: strings.feedback,
-                ),
-                _SettingTile(
-                  icon: Icons.star,
-                  iconColor: AppColors.accent,
-                  title: strings.rate,
-                ),
-                _SettingTile(
-                  icon: Icons.info,
-                  iconColor: const Color(0xFF5B7DB1),
-                  title: strings.about,
-                ),
-              ],
+    return Scaffold(
+      appBar: AppBar(title: Text(strings.profile)),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 116),
+          children: [
+            _ProfileCard(
+              fullName: _fullName ?? 'User Name',
+              email: _email ?? 'user@email.com',
+              avatarUrl: _avatarUrl,
+              loading: _loadingProfile,
+              error: _error,
+              onRetry: _loadProfile,
+              onEdit: _showEditProfile,
             ),
-          ),
-          const SizedBox(height: 16),
-          AppButton(
-            label: _loggingOut ? 'Kuting...' : strings.logout,
-            style: AppButtonStyle.outline,
-            onPressed: _loggingOut ? null : _confirmLogout,
-          ),
-        ],
+            const SizedBox(height: 18),
+            Text(
+              strings.notificationIntegration,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            _TelegramCard(
+              connected: _telegramConnected,
+              onConnect: _toggleTelegram,
+            ),
+            const SizedBox(height: 12),
+            _EmailCard(
+              enabled: _emailEnabled,
+              onChanged: (value) {
+                setState(() => _emailEnabled = value);
+                _saveNotificationSettings();
+              },
+            ),
+            const SizedBox(height: 12),
+            _PermissionCard(
+              loading: _loadingPermissions,
+              notificationsAllowed: _notificationsAllowed,
+              exactAlarmsAllowed: _exactAlarmsAllowed,
+              onRefresh: _loadPermissionState,
+              onRequestNotifications: _requestNotifications,
+              onRequestExactAlarms: _requestExactAlarms,
+              onOpenAppSettings: _openAppSettings,
+              onOpenBatterySettings: _openBatterySettings,
+            ),
+            const SizedBox(height: 18),
+            Text(
+              strings.settings,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            AppCard(
+              radius: 16,
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  _SettingTile(
+                    icon: Icons.dark_mode,
+                    iconColor: const Color(0xFF64748B),
+                    title: strings.darkMode,
+                    trailing: Switch(
+                      value: settings.darkMode,
+                      onChanged: (value) {
+                        settings.setDarkMode(value);
+                        _saveProfile(settings);
+                      },
+                    ),
+                  ),
+                  _SettingTile(
+                    icon: Icons.notifications,
+                    iconColor: AppColors.accent,
+                    title: strings.appNotification,
+                    trailing: Switch(
+                      value: _appNotifications,
+                      onChanged: (value) {
+                        setState(() => _appNotifications = value);
+                        _saveNotificationSettings();
+                      },
+                    ),
+                  ),
+                  _SettingTile(
+                    icon: Icons.alarm_on,
+                    iconColor: AppColors.primary,
+                    title: 'Eslatma ruxsatlari',
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.reminderAccess),
+                  ),
+                  _SettingTile(
+                    icon: Icons.language,
+                    iconColor: AppColors.secondary,
+                    title: strings.languageText,
+                    trailing: DropdownButton<AppLanguage>(
+                      value: settings.language,
+                      underline: const SizedBox.shrink(),
+                      items: const [
+                        DropdownMenuItem(
+                          value: AppLanguage.uz,
+                          child: Text("O'zbek"),
+                        ),
+                        DropdownMenuItem(
+                          value: AppLanguage.en,
+                          child: Text('English'),
+                        ),
+                        DropdownMenuItem(
+                          value: AppLanguage.ru,
+                          child: Text('Русский'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        settings.setLanguage(value);
+                        _saveProfile(settings);
+                      },
+                    ),
+                  ),
+                  _SettingTile(
+                    icon: Icons.auto_awesome,
+                    iconColor: AppColors.secondary,
+                    title: 'AI yordamchi',
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.aiAssistant),
+                  ),
+                  _SettingTile(
+                    icon: Icons.volume_up,
+                    iconColor: AppColors.accent,
+                    title: 'Ovozli eslatma',
+                    onTap: _testVoiceReminder,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            AppButton(
+              label: _loggingOut ? 'Kuting...' : strings.logout,
+              style: AppButtonStyle.outline,
+              onPressed: _loggingOut ? null : _confirmLogout,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -288,20 +193,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _confirmLogout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Chiqmoqchimisiz?'),
-        actions: [
-          OutlinedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: AppColors.errorSoft,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(
+                  Icons.logout_rounded,
+                  color: AppColors.error,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Chiqmoqchimisiz?',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Hisobdan chiqasiz, keyin yana login qilishingiz kerak bo‘ladi.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ActionChip(
+                      label: const Center(child: Text('Bekor qilish')),
+                      onPressed: () => Navigator.pop(context, false),
+                      backgroundColor: AppColors.successSoft,
+                      labelStyle: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ActionChip(
+                      label: const Center(child: Text('Chiqish')),
+                      onPressed: () => Navigator.pop(context, true),
+                      backgroundColor: AppColors.error,
+                      labelStyle: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Ok'),
-          ),
-        ],
+        ),
       ),
     );
     if (shouldLogout != true) return;
@@ -339,13 +296,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _fullName = (data['full_name'] ?? data['name'])?.toString();
         _email = data['email']?.toString();
+        _avatarUrl = data['avatar_url']?.toString();
         _appNotifications =
             data['app_notifications_enabled'] as bool? ?? _appNotifications;
         _emailEnabled =
             data['email_notifications_enabled'] as bool? ?? _emailEnabled;
         _telegramConnected =
-            data['telegram_notifications_enabled'] as bool? ??
             data['telegram_connected'] as bool? ??
+            data['telegram_notifications_enabled'] as bool? ??
             _telegramConnected;
       });
     } on AuthApiException catch (error) {
@@ -353,21 +311,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _loadingProfile = false);
     }
-  }
-
-  Future<void> _loadQuickStats() async {
-    try {
-      final stats = await _api.getStatistics(period: 7);
-      if (mounted) setState(() => _quickStats = stats);
-    } on AuthApiException {
-      // Profil asosiy ma'lumotlari stats endpointga bog'lanib qolmasin.
-    }
-  }
-
-  int _statCount(String key) {
-    final value = _quickStats['${key}_count'] ?? _quickStats[key];
-    if (value is int) return value;
-    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   Future<void> _saveProfile(AppSettings settings) async {
@@ -451,63 +394,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _exportBackup() async {
-    try {
-      final json = await BackupService(api: _api).exportJson();
-      await Clipboard.setData(ClipboardData(text: json));
-      _showError('Backup clipboardga ko‘chirildi');
-    } on AuthApiException catch (error) {
-      _showError(error.userMessage);
-    }
-  }
-
-  Future<void> _restoreBackup() async {
-    final controller = TextEditingController();
-    final confirmed = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          8,
-          16,
-          MediaQuery.of(context).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Restore', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              minLines: 4,
-              maxLines: 7,
-              decoration: const InputDecoration(
-                hintText: 'Backup JSON ni shu yerga joylang',
-              ),
-            ),
-            const SizedBox(height: 12),
-            AppButton(
-              label: 'Restore',
-              onPressed: () => Navigator.pop(context, true),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      final count = await BackupService(api: _api).restoreJson(controller.text);
-      _showError('$count ta yozuv tiklandi');
-    } catch (error) {
-      _showError('Restore xatosi: $error');
-    }
-  }
-
   Future<void> _testVoiceReminder() async {
     await VoiceService.instance.speak('MedReminder eslatma sinovi');
-    _showError('Voice reminder sinovi yuborildi');
+    _showError('Ovozli eslatma sinovi yuborildi');
   }
 
   Future<void> _saveNotificationSettings() async {
@@ -570,7 +459,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
       final link = await _api.getTelegramConnectLink();
       final url = (link['telegram_url'] ?? '').toString();
-      final code = (link['connect_code'] ?? '').toString();
+      final code = (link['connect_code'] ?? link['code'] ?? '').toString();
       await Clipboard.setData(ClipboardData(text: url));
       final opened = await launchUrl(
         Uri.parse(url),
@@ -594,9 +483,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       }
+      await _waitForTelegramConnection(code);
     } on AuthApiException catch (error) {
       _showError(error.message);
     }
+  }
+
+  Future<void> _waitForTelegramConnection(String code) async {
+    if (code.isEmpty) {
+      await _loadProfile();
+      return;
+    }
+    for (var attempt = 0; attempt < 15; attempt++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      try {
+        final status = await _api.getTelegramConnectStatus(code);
+        final connected = status['connected'] as bool? ?? false;
+        if (connected) {
+          setState(() => _telegramConnected = true);
+          _showError('Telegram ulandi');
+          return;
+        }
+      } on AuthApiException {
+        // Polling vaqtinchalik xatoda davom etsin.
+      }
+    }
+    await _loadProfile();
+    if (!mounted || _telegramConnected) return;
+    _showError('Botda Start bosilgandan keyin ulanish holatini yangilang');
   }
 }
 
@@ -604,6 +519,7 @@ class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.fullName,
     required this.email,
+    required this.avatarUrl,
     required this.loading,
     required this.onRetry,
     required this.onEdit,
@@ -612,6 +528,7 @@ class _ProfileCard extends StatelessWidget {
 
   final String fullName;
   final String email;
+  final String? avatarUrl;
   final bool loading;
   final String? error;
   final VoidCallback onRetry;
@@ -619,6 +536,7 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final avatarImage = _avatarImage(avatarUrl);
     return AppCard(
       radius: 18,
       floating: true,
@@ -632,9 +550,12 @@ class _ProfileCard extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.primary, width: 3),
             ),
-            child: const CircleAvatar(
+            child: CircleAvatar(
               backgroundColor: Color(0xFFDFF6E9),
-              child: Icon(Icons.face_6, color: Color(0xFF7A4A2A), size: 58),
+              backgroundImage: avatarImage,
+              child: avatarImage == null
+                  ? const Icon(Icons.face_6, color: Color(0xFF7A4A2A), size: 58)
+                  : null,
             ),
           ),
           const SizedBox(height: 10),
@@ -673,62 +594,14 @@ class _ProfileCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _QuickStat extends StatelessWidget {
-  const _QuickStat({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.value,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      radius: 12,
-      padding: const EdgeInsets.all(10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 17),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 2,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.medication, color: color, size: 16),
-              const SizedBox(width: 5),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  static ImageProvider<Object>? _avatarImage(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final text = value.trim();
+    if (text.startsWith('http://') || text.startsWith('https://')) {
+      return NetworkImage(text);
+    }
+    return FileImage(File(text));
   }
 }
 
@@ -788,13 +661,13 @@ class _PermissionCard extends StatelessWidget {
             const LinearProgressIndicator(minHeight: 3)
           else ...[
             _PermissionLine(
-              label: 'Notification',
+              label: 'Bildirishnoma',
               ok: notificationsAllowed,
               actionLabel: 'Ruxsat',
               onTap: onRequestNotifications,
             ),
             _PermissionLine(
-              label: 'Exact alarm',
+              label: 'Aniq budilnik',
               ok: exactAlarmsAllowed,
               actionLabel: 'Sozlash',
               onTap: onRequestExactAlarms,
@@ -806,7 +679,7 @@ class _PermissionCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onOpenAppSettings,
                     icon: const Icon(Icons.settings, size: 18),
-                    label: const Text('App settings'),
+                    label: const Text('Ilova sozlamasi'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -814,7 +687,7 @@ class _PermissionCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onOpenBatterySettings,
                     icon: const Icon(Icons.battery_saver, size: 18),
-                    label: const Text('Battery'),
+                    label: const Text('Batareya'),
                   ),
                 ),
               ],
@@ -961,7 +834,7 @@ class _EmailCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Email irän',
+                      'Emailni ulash',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 15,
@@ -987,7 +860,7 @@ class _EmailCard extends StatelessWidget {
           const SizedBox(height: 10),
           TextField(
             decoration: InputDecoration(
-              hintText: 'Modify your email address',
+              hintText: 'Email manzilini kiriting',
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
                 vertical: 10,
@@ -1036,62 +909,4 @@ class _SettingTile extends StatelessWidget {
       trailing: trailing ?? const Icon(Icons.chevron_right, size: 18),
     );
   }
-}
-
-class _FamilyAvatars extends StatelessWidget {
-  const _FamilyAvatars();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Oila a'zolari", style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const _SmallAvatar(icon: Icons.face_6),
-              const SizedBox(width: 8),
-              const _SmallAvatar(icon: Icons.face_3),
-              const SizedBox(width: 8),
-              const _SmallAvatar(icon: Icons.face_4),
-              const Spacer(),
-              CircleAvatar(
-                backgroundColor: AppColors.border,
-                child: IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.add),
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Text(
-                "Qo'shish",
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SmallAvatar extends StatelessWidget {
-  const _SmallAvatar({required this.icon});
-  final IconData icon;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(2),
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      border: Border.all(color: AppColors.primary, width: 2),
-    ),
-    child: CircleAvatar(
-      radius: 20,
-      backgroundColor: AppColors.successSoft,
-      child: Icon(icon, color: Theme.of(context).colorScheme.onSurface),
-    ),
-  );
 }

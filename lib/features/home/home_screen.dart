@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -25,11 +26,13 @@ class _HomeScreenState extends State<HomeScreen> {
   static _Dashboard? _cache;
   static DateTime? _cacheAt;
   static String? _profileNameCache;
+  static String? _profileAvatarCache;
 
   final _api = ApiClient();
   var _loading = true;
   String? _error;
   String? _profileName;
+  String? _profileAvatarUrl;
   var _dashboard = _Dashboard.empty();
   Timer? _refreshDebounce;
 
@@ -38,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     AppEvents.medicineChanged.addListener(_queueRefresh);
     _profileName = _profileNameCache;
+    _profileAvatarUrl = _profileAvatarCache;
     unawaited(_loadProfile());
     final cached = _cache;
     if (cached != null) {
@@ -65,166 +69,194 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 116),
-        children: [
-          _HomeHeader(strings: strings, profileName: _profileName),
-          const SizedBox(height: 18),
-          Text(
-            strings.todayMedicines,
-            style: Theme.of(context).textTheme.titleMedium,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          _profileName == null || _profileName!.isEmpty
+              ? 'Salom'
+              : 'Salom, $_profileName',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            tooltip: strings.notifications,
+            onPressed: () =>
+                Navigator.pushNamed(context, AppRoutes.notifications),
+            icon: const Icon(Icons.notifications_none_rounded),
           ),
-          const SizedBox(height: 8),
-          _TodaySummaryCard(
-            strings: strings,
-            loading: _loading,
-            error: _error,
-            dashboard: _dashboard,
-            onRetry: () => _loadDashboard(showLoading: true),
-            onStatusChanged: _updateStatus,
-            onOpenDetails: () =>
-                Navigator.pushNamed(context, AppRoutes.calendar),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _HomeAvatar(avatarUrl: _profileAvatarUrl),
           ),
-          const SizedBox(height: 18),
-          AppCard(
-            radius: 18,
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 92,
-                  height: 92,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      SizedBox(
-                        width: 78,
-                        height: 78,
-                        child: CircularProgressIndicator(
-                          value: _dashboard.progress,
-                          strokeWidth: 9,
-                          color: AppColors.primary,
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.outlineVariant,
-                          strokeCap: StrokeCap.round,
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 116),
+          children: [
+            Text(
+              strings.todayMedicines,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            _TodaySummaryCard(
+              strings: strings,
+              loading: _loading,
+              error: _error,
+              dashboard: _dashboard,
+              onRetry: () => _loadDashboard(showLoading: true),
+              onStatusChanged: _updateStatus,
+              onOpenDetails: () =>
+                  Navigator.pushNamed(context, AppRoutes.calendar),
+            ),
+            const SizedBox(height: 18),
+            AppCard(
+              radius: 18,
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 92,
+                    height: 92,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 78,
+                          height: 78,
+                          child: CircularProgressIndicator(
+                            value: _dashboard.progress,
+                            strokeWidth: 9,
+                            color: AppColors.primary,
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.outlineVariant,
+                            strokeCap: StrokeCap.round,
+                          ),
                         ),
-                      ),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${(_dashboard.progress * 100).round()}%',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          Text(
-                            strings.completed,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                  fontSize: 9,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ],
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${(_dashboard.progress * 100).round()}%',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            Text(
+                              strings.completed,
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                    fontSize: 9,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _ProgressLegend(
+                          color: AppColors.primary,
+                          text:
+                              '${_dashboard.taken} ${statusLabel(MedicineStatus.taken).toLowerCase()}',
+                        ),
+                        const SizedBox(height: 8),
+                        _ProgressLegend(
+                          color: AppColors.accent,
+                          text: '${_dashboard.pending} ${strings.remaining}',
+                        ),
+                        const SizedBox(height: 8),
+                        _ProgressLegend(
+                          color: AppColors.error,
+                          text:
+                              '${_dashboard.missed} ${statusLabel(MedicineStatus.missed).toLowerCase()}',
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Tezkor amallar',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickAction(
+                    icon: Icons.add_box_outlined,
+                    label: strings.add,
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.addMedicine),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    children: [
-                      _ProgressLegend(
-                        color: AppColors.primary,
-                        text:
-                            '${_dashboard.taken} ${statusLabel(MedicineStatus.taken).toLowerCase()}',
-                      ),
-                      const SizedBox(height: 8),
-                      _ProgressLegend(
-                        color: AppColors.accent,
-                        text: '${_dashboard.pending} ${strings.remaining}',
-                      ),
-                      const SizedBox(height: 8),
-                      _ProgressLegend(
-                        color: AppColors.error,
-                        text:
-                            '${_dashboard.missed} ${statusLabel(MedicineStatus.missed).toLowerCase()}',
-                      ),
-                    ],
+                  child: _QuickAction(
+                    icon: Icons.bar_chart_rounded,
+                    label: strings.stats,
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.calendar),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _QuickAction(
+                    icon: Icons.groups_outlined,
+                    label: 'Oila',
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.family),
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 18),
-          Text('Quick actions', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _QuickAction(
-                  icon: Icons.add_box_outlined,
-                  label: strings.add,
-                  onTap: () =>
-                      Navigator.pushNamed(context, AppRoutes.addMedicine),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _QuickAction(
-                  icon: Icons.bar_chart_rounded,
-                  label: strings.stats,
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.calendar),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _QuickAction(
-                  icon: Icons.groups_outlined,
-                  label: 'Oila',
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.family),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            strings.todayMedicines,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 88,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: _dashboard.upcomingMedicines.isEmpty
-                  ? [
-                      SizedBox(
-                        width: 220,
-                        child: AppCard(
-                          radius: 18,
-                          child: Center(child: Text(strings.noMedicinesToday)),
-                        ),
-                      ),
-                    ]
-                  : _dashboard.upcomingMedicines
-                        .map(
-                          (medicine) => Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: _UpcomingMedicine(
-                              time: medicine.time,
-                              title: medicine.name,
-                              dose: medicine.dose,
+            const SizedBox(height: 18),
+            Text(
+              strings.todayMedicines,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 88,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: _dashboard.upcomingMedicines.isEmpty
+                    ? [
+                        SizedBox(
+                          width: 220,
+                          child: AppCard(
+                            radius: 18,
+                            child: Center(
+                              child: Text(strings.noMedicinesToday),
                             ),
                           ),
-                        )
-                        .toList(),
+                        ),
+                      ]
+                    : _dashboard.upcomingMedicines
+                          .map(
+                            (medicine) => Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: _UpcomingMedicine(
+                                time: medicine.time,
+                                title: medicine.name,
+                                dose: medicine.dose,
+                              ),
+                            ),
+                          )
+                          .toList(),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -272,11 +304,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      final profile = await _api.getProfile();
+      final json = await _api.getProfile();
+      final profile = json['data'] is Map<String, dynamic>
+          ? json['data'] as Map<String, dynamic>
+          : json;
       final name = (profile['full_name'] ?? profile['name'])?.toString().trim();
-      if (!mounted || name == null || name.isEmpty) return;
+      final avatar = profile['avatar_url']?.toString().trim();
+      if (!mounted) return;
+      if (name == null || name.isEmpty) return;
       _profileNameCache = name;
-      setState(() => _profileName = name);
+      _profileAvatarCache = avatar?.isEmpty == true ? null : avatar;
+      setState(() {
+        _profileName = name;
+        _profileAvatarUrl = _profileAvatarCache;
+      });
     } on AuthApiException {
       // Header can still render while profile is unavailable.
     }
@@ -427,62 +468,39 @@ class _Dashboard {
   }
 }
 
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({required this.strings, required this.profileName});
+class _HomeAvatar extends StatelessWidget {
+  const _HomeAvatar({required this.avatarUrl});
 
-  final AppStrings strings;
-  final String? profileName;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                profileName == null || profileName!.isEmpty
-                    ? strings.greeting
-                    : 'Salom, $profileName',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${now.year}',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-        IconButton(
-          onPressed: () =>
-              Navigator.pushNamed(context, AppRoutes.notifications),
-          icon: const Icon(Icons.notifications_none_rounded, size: 22),
-        ),
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(19),
-            gradient: LinearGradient(
-              colors: dark
-                  ? const [Color(0xFF334155), Color(0xFF1E293B)]
-                  : const [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
-            ),
-          ),
-          child: Icon(
-            Icons.person,
-            color: Theme.of(context).colorScheme.onSurface,
-            size: 24,
-          ),
-        ),
-      ],
+    final avatarImage = _avatarImage(avatarUrl);
+    return Container(
+      width: 38,
+      height: 38,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+      ),
+      child: CircleAvatar(
+        backgroundColor: AppColors.successSoft,
+        backgroundImage: avatarImage,
+        child: avatarImage == null
+            ? const Icon(Icons.person, color: AppColors.primary, size: 21)
+            : null,
+      ),
     );
+  }
+
+  static ImageProvider<Object>? _avatarImage(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final text = value.trim();
+    if (text.startsWith('http://') || text.startsWith('https://')) {
+      return NetworkImage(text);
+    }
+    return FileImage(File(text));
   }
 }
 

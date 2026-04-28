@@ -26,7 +26,7 @@ blp = Blueprint("auth", __name__, description="Autentifikatsiya")
 def register(data):
     if User.query.filter_by(email=data["email"].lower()).first():
         return error("Bu email allaqachon ro'yxatdan o'tgan", status_code=409)
-    user = User(full_name=data["full_name"], email=data["email"].lower(), password_hash=hash_password(data["password"]))
+    user = User(full_name=data["full_name"], email=data["email"].lower(), password_hash=hash_password(data["password"]), avatar_url=data["avatar_url"])
     db.session.add(user)
     db.session.commit()
     code = create_email_code(user, "register")

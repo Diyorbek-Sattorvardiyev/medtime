@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/api_client.dart';
 import '../../core/app_colors.dart';
@@ -9,6 +11,7 @@ import '../../core/reminder_service.dart';
 import '../../core/storage/offline_medicine_queue.dart';
 import '../../core/utils/app_events.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/app_card.dart';
 import '../../widgets/app_chip.dart';
 
 class AddMedicineScreen extends StatefulWidget {
@@ -27,6 +30,7 @@ class AddMedicineScreen extends StatefulWidget {
 
 class _AddMedicineScreenState extends State<AddMedicineScreen> {
   final _api = ApiClient();
+  final _imagePicker = ImagePicker();
   final _nameController = TextEditingController();
   final _notesController = TextEditingController();
   final _stockController = TextEditingController();
@@ -34,12 +38,13 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   var _dose = '1 tabletka';
   var _intake = 'Ovqatdan oldin';
   var _reminderOn = true;
-  var _reminderBeforeMinutes = 30;
+  var _reminderBeforeMinutes = 0;
   var _refillReminderOn = false;
   var _startDate = DateTime.now();
   DateTime? _endDate;
   var _loading = false;
   String? _error;
+  String? _imagePath;
   int? _familyMemberId;
   final _familyMembers = <Map<String, dynamic>>[];
   final _days = {'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'};
@@ -65,150 +70,136 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(_editing ? 'Dorini tahrirlash' : "Dori qo'shish"),
+        leading: IconButton(
+          onPressed: () => Navigator.maybePop(context),
+          icon: const Icon(Icons.close_rounded),
+        ),
+      ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 116),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 116),
           children: [
-            Row(
-              children: [
-                IconButton.filledTonal(
-                  onPressed: () => Navigator.maybePop(context),
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      _editing ? 'Dorini tahrirlash' : "Dori qo'shish",
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                  ),
-                ),
-                IconButton.filledTonal(
-                  onPressed: _loading ? null : _saveMedicine,
-                  icon: const Icon(Icons.save_outlined),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            FutureBuilder<int>(
-              future: OfflineMedicineQueue.pendingCount(),
-              builder: (context, snapshot) {
-                final count = snapshot.data ?? 0;
-                if (count == 0) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _OfflineQueueBanner(
-                    count: count,
-                    onSync: _syncPendingMedicines,
-                  ),
-                );
-              },
-            ),
-            if (_familyMembers.isNotEmpty) ...[
-              _Section(
-                title: "KIM UCHUN",
-                child: DropdownButtonFormField<int?>(
-                  initialValue: _familyMemberId,
-                  decoration: const InputDecoration(
-                    hintText: "O'zim uchun",
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  items: [
-                    const DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text("O'zim uchun"),
-                    ),
-                    ..._familyMembers.map(
-                      (member) => DropdownMenuItem<int?>(
-                        value: int.tryParse(member['id'].toString()),
-                        child: Text(member['full_name'].toString()),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) => setState(() => _familyMemberId = value),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            _DarkInput(
-              controller: _nameController,
-              label: 'MEDICINE NAME',
-              hint: 'Dori nomini kiriting',
-              error: _error,
-              suffix: Icons.edit,
-            ),
-            const SizedBox(height: 16),
-            _Section(
-              title: 'DOSE (DOZASI)',
-              child: Wrap(
-                spacing: 8,
-                children: ['1 tabletka', '2 tabletka', '5 ml', 'Custom']
-                    .map(
-                      (dose) => _ChoicePill(
-                        label: dose,
-                        selected: _dose == dose,
-                        onTap: () => setState(() => _dose = dose),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _Section(
-              title: 'TIME PICKER',
+            AppCard(
+              radius: 22,
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Qabul qilish vaqti',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontWeight: FontWeight.w700,
+                  FutureBuilder<int>(
+                    future: OfflineMedicineQueue.pendingCount(),
+                    builder: (context, snapshot) {
+                      final count = snapshot.data ?? 0;
+                      if (count == 0) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _OfflineQueueBanner(
+                          count: count,
+                          onSync: _syncPendingMedicines,
+                        ),
+                      );
+                    },
+                  ),
+                  if (_familyMembers.isNotEmpty) ...[
+                    const _FormLabel("Kim uchun"),
+                    _CompactDropdown<int?>(
+                      value: _familyMemberId,
+                      icon: Icons.person_outline,
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text("O'zim uchun"),
+                        ),
+                        ..._familyMembers.map(
+                          (member) => DropdownMenuItem<int?>(
+                            value: int.tryParse(member['id'].toString()),
+                            child: Text(member['full_name'].toString()),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _familyMemberId = value),
                     ),
+                    const SizedBox(height: 10),
+                  ],
+                  const _FormLabel('Dori nomi'),
+                  _CompactTextField(
+                    controller: _nameController,
+                    hint: 'Dori nomi',
+                    error: _error,
                   ),
                   const SizedBox(height: 10),
+                  const _FormLabel('Rasm'),
+                  _CompactImagePicker(
+                    imagePath: _imagePath,
+                    onCamera: () => _pickImage(ImageSource.camera),
+                    onGallery: () => _pickImage(ImageSource.gallery),
+                  ),
+                  const SizedBox(height: 10),
+                  const _FormLabel('Doza'),
+                  _CompactDropdown<String>(
+                    value: _dose,
+                    items: ['1 tabletka', '2 tabletka', '5 ml', 'Boshqa']
+                        .map(
+                          (dose) => DropdownMenuItem<String>(
+                            value: dose,
+                            child: Text(dose),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) setState(() => _dose = value);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  const _FormLabel('Vaqt'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
+                      ActionChip(
+                        avatar: const Icon(Icons.schedule_outlined, size: 15),
+                        label: const Text('Vaqt'),
+                        onPressed: _showTimePicker,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                      ),
                       ..._times.map(
                         (time) => InputChip(
+                          avatar: const Icon(Icons.access_time, size: 15),
                           label: Text(time),
-                          avatar: const Icon(Icons.schedule, size: 16),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                           onDeleted: _times.length == 1
                               ? null
                               : () => setState(() => _times.remove(time)),
                         ),
                       ),
-                      IconButton.filledTonal(
-                        tooltip: "Vaqt qo'shish",
-                        onPressed: _showTimePicker,
-                        icon: const Icon(Icons.add),
-                      ),
                       ActionChip(
-                        avatar: const Icon(Icons.timelapse, size: 17),
-                        label: const Text("Oraliq"),
+                        avatar: const Icon(Icons.timelapse, size: 15),
+                        label: const Text('Oraliq'),
                         onPressed: _showIntervalPicker,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _Section(
-              title: 'REPEAT SCHEDULE',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                  const SizedBox(height: 12),
+                  const _FormLabel('Kunlik takrorlanish'),
                   Wrap(
                     spacing: 8,
+                    runSpacing: 8,
                     children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
                         .map((day) {
                           final selected = _days.contains(day);
-                          return _ChoicePill(
-                            label: day,
+                          return _DayCircle(
+                            label: _shortDay(day),
                             selected: selected,
                             onTap: () => setState(
                               () =>
@@ -219,199 +210,80 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                         .toList(),
                   ),
                   const SizedBox(height: 12),
+                  const _FormLabel('Sana'),
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          'Har kuni',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
+                        child: _DatePill(
+                          text: _dateOnly(_startDate),
+                          onTap: _pickStartDate,
                         ),
                       ),
-                      Switch(
-                        value: _days.length == 7,
-                        onChanged: (value) => setState(() {
-                          _days
-                            ..clear()
-                            ..addAll(
-                              value
-                                  ? [
-                                      'Mon',
-                                      'Tue',
-                                      'Wed',
-                                      'Thu',
-                                      'Fri',
-                                      'Sat',
-                                      'Sun',
-                                    ]
-                                  : ['Mon'],
-                            );
-                        }),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _DatePill(
+                          text: _endDate == null
+                              ? 'Tugash sanasi'
+                              : _dateOnly(_endDate!),
+                          onTap: _pickEndDate,
+                          onClear: _endDate == null
+                              ? null
+                              : () => setState(() => _endDate = null),
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _Section(
-              title: 'DATE RANGE',
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _DateBox(
-                      label: 'Start date',
-                      value: _dateOnly(_startDate),
-                      onTap: _pickStartDate,
+                  const SizedBox(height: 12),
+                  const _FormLabel('Ovqatdan oldin / keyin'),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children:
+                          ['Ovqatdan oldin', 'Ovqatdan keyin', "Farqi yo'q"]
+                              .map(
+                                (item) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: _SegmentPill(
+                                    label: item,
+                                    selected: _intake == item,
+                                    onTap: () => setState(() => _intake = item),
+                                  ),
+                                ),
+                              )
+                              .toList(),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _DateBox(
-                      label: 'End date',
-                      value: _endDate == null
-                          ? 'Cheklanmagan'
-                          : _dateOnly(_endDate!),
-                      onTap: _pickEndDate,
-                      onClear: _endDate == null
-                          ? null
-                          : () => setState(() => _endDate = null),
-                    ),
+                  const SizedBox(height: 12),
+                  _ReminderPanel(
+                    reminderOn: _reminderOn,
+                    reminderBeforeMinutes: _reminderBeforeMinutes,
+                    refillReminderOn: _refillReminderOn,
+                    stockController: _stockController,
+                    refillThresholdController: _refillThresholdController,
+                    onReminderChanged: (value) =>
+                        setState(() => _reminderOn = value),
+                    onRefillChanged: (value) =>
+                        setState(() => _refillReminderOn = value),
+                    onMinuteChanged: (value) =>
+                        setState(() => _reminderBeforeMinutes = value),
+                  ),
+                  const SizedBox(height: 12),
+                  _CompactTextField(
+                    controller: _notesController,
+                    hint: "Qo'shimcha izoh",
+                    minLines: 2,
+                  ),
+                  const SizedBox(height: 16),
+                  AppButton(
+                    label: _loading
+                        ? 'Saqlanmoqda...'
+                        : _editing
+                        ? 'Yangilash'
+                        : 'Saqlash',
+                    onPressed: _loading ? null : _saveMedicine,
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-            _Section(
-              title: 'INTAKE TYPE',
-              child: Wrap(
-                spacing: 8,
-                children: ['Ovqatdan oldin', 'Ovqatdan keyin', "Farqi yo'q"]
-                    .map(
-                      (item) => _ChoicePill(
-                        label: item,
-                        selected: _intake == item,
-                        onTap: () => setState(() => _intake = item),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _Section(
-              title: 'REMINDER SETTINGS',
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Turn reminder ON',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                      Switch(
-                        value: _reminderOn,
-                        onChanged: (v) => setState(() => _reminderOn = v),
-                      ),
-                    ],
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Delay options',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [0, 5, 10, 30]
-                        .map(
-                          (minute) => _ChoicePill(
-                            label: minute == 0 ? 'vaqtida' : '$minute min',
-                            selected: _reminderBeforeMinutes == minute,
-                            onTap: () =>
-                                setState(() => _reminderBeforeMinutes = minute),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _Section(
-              title: 'REFILL REMINDER',
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Dori tugashini eslatish',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                      Switch(
-                        value: _refillReminderOn,
-                        onChanged: (v) => setState(() => _refillReminderOn = v),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _stockController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Hozir nechta qoldi',
-                            prefixIcon: Icon(Icons.inventory_2_outlined),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: _refillThresholdController,
-                          keyboardType: TextInputType.number,
-                          enabled: _refillReminderOn,
-                          decoration: const InputDecoration(
-                            labelText: 'Nechtada eslatish',
-                            prefixIcon: Icon(Icons.notification_important),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _DarkInput(
-              controller: _notesController,
-              label: 'NOTES (OPTIONAL)',
-              hint: "Qo'shimcha izoh yozing",
-              minLines: 3,
-            ),
-            const SizedBox(height: 16),
-            AppButton(
-              label: _loading
-                  ? 'Saqlanmoqda...'
-                  : _editing
-                  ? 'Yangilash'
-                  : 'Saqlash',
-              onPressed: _loading ? null : _saveMedicine,
             ),
           ],
         ),
@@ -442,6 +314,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     }
     _nameController.text = (medicine['name'] ?? '').toString();
     _notesController.text = (medicine['notes'] ?? '').toString();
+    _imagePath = (medicine['image_url'] ?? '').toString().trim().isEmpty
+        ? null
+        : (medicine['image_url'] ?? '').toString();
     _dose = (medicine['dosage'] ?? _dose).toString();
     _intake = _intakeLabel(medicine['intake_type']);
     _stockController.text = (medicine['stock_quantity'] ?? '').toString();
@@ -490,7 +365,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Time Picker', style: Theme.of(context).textTheme.titleLarge),
+            Text('Vaqt tanlash', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 18),
             Wrap(
               spacing: 10,
@@ -697,6 +572,10 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       setState(() => _error = 'Majburiy maydon');
       return;
     }
+    if (_imagePath == null || _imagePath!.trim().isEmpty) {
+      setState(() => _error = 'Dori rasmini yuklash majburiy');
+      return;
+    }
     if (_days.isEmpty || _times.isEmpty) {
       setState(() => _error = 'Kamida bitta kun va vaqt tanlang');
       return;
@@ -754,6 +633,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     _stockController.clear();
     _refillThresholdController.text = '5';
     _refillReminderOn = false;
+    _imagePath = null;
   }
 
   Map<String, dynamic> _medicineBody(String name) {
@@ -761,6 +641,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       'family_member_id': _familyMemberId,
       'name': name,
       'dosage': _dose,
+      'image_url': _imagePath,
       'intake_type': _intakeType,
       'notes': _notesController.text.trim(),
       'stock_quantity': _optionalInt(_stockController.text),
@@ -782,6 +663,19 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           )
           .toList(),
     };
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picked = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 78,
+      maxWidth: 1200,
+    );
+    if (picked == null) return;
+    setState(() {
+      _imagePath = picked.path;
+      _error = null;
+    });
   }
 
   Future<void> _syncPendingMedicines() async {
@@ -865,6 +759,19 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     };
   }
 
+  static String _shortDay(String value) {
+    return switch (value) {
+      'Mon' => 'M',
+      'Tue' => 'T',
+      'Wed' => 'W',
+      'Thu' => 'Th',
+      'Fri' => 'F',
+      'Sat' => 'Sa',
+      'Sun' => 'SA',
+      _ => value,
+    };
+  }
+
   static String _timeText(TimeOfDay time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
@@ -894,30 +801,413 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child});
-  final String title;
-  final Widget child;
+class _FormLabel extends StatelessWidget {
+  const _FormLabel(this.text);
+
+  final String text;
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        child,
-      ],
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 5),
+    child: Text(
+      text,
+      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
     ),
   );
+}
+
+class _CompactTextField extends StatelessWidget {
+  const _CompactTextField({
+    required this.controller,
+    required this.hint,
+    this.error,
+    this.minLines = 1,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final String? error;
+  final int minLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      minLines: minLines,
+      maxLines: minLines,
+      decoration: InputDecoration(
+        hintText: hint,
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 11,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(9),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(9),
+          borderSide: BorderSide(
+            color: error == null ? Colors.transparent : AppColors.error,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactDropdown<T> extends StatelessWidget {
+  const _CompactDropdown({
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.icon,
+  });
+
+  final T value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<T>(
+      initialValue: value,
+      items: items,
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        prefixIcon: icon == null ? null : Icon(icon, size: 18),
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(9),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactImagePicker extends StatelessWidget {
+  const _CompactImagePicker({
+    required this.imagePath,
+    required this.onCamera,
+    required this.onGallery,
+  });
+
+  final String? imagePath;
+  final VoidCallback onCamera;
+  final VoidCallback onGallery;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = imagePath;
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: path == null || path.isEmpty
+                  ? ColoredBox(
+                      color: Theme.of(context).colorScheme.surface,
+                      child: Icon(
+                        Icons.add_photo_alternate_outlined,
+                        color: AppColors.primary,
+                      ),
+                    )
+                  : Image.file(
+                      File(path),
+                      cacheWidth: 88,
+                      cacheHeight: 88,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => ColoredBox(
+                        color: Theme.of(context).colorScheme.surface,
+                        child: Icon(
+                          Icons.add_photo_alternate_outlined,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              path == null || path.isEmpty
+                  ? 'Kamera yoki galereyadan rasm tanlang'
+                  : 'Rasm tanlandi',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: onCamera,
+            icon: const Icon(Icons.photo_camera_outlined, size: 20),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: onGallery,
+            icon: const Icon(Icons.photo_library_outlined, size: 20),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DayCircle extends StatelessWidget {
+  const _DayCircle({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 32,
+        height: 32,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          shape: BoxShape.circle,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected
+                ? Colors.white
+                : Theme.of(context).colorScheme.onSurface,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DatePill extends StatelessWidget {
+  const _DatePill({required this.text, required this.onTap, this.onClear});
+
+  final String text;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(9),
+      onTap: onTap,
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (onClear != null)
+              InkWell(onTap: onClear, child: const Icon(Icons.close, size: 16))
+            else
+              const Icon(Icons.calendar_month_outlined, size: 17),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SegmentPill extends StatelessWidget {
+  const _SegmentPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      selected: selected,
+      label: Text(label),
+      onSelected: (_) => onTap(),
+      selectedColor: AppColors.successSoft,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      side: BorderSide(
+        color: selected
+            ? AppColors.primary.withValues(alpha: 0.35)
+            : Colors.transparent,
+      ),
+      labelStyle: TextStyle(
+        color: selected
+            ? AppColors.primary
+            : Theme.of(context).colorScheme.onSurface,
+        fontWeight: FontWeight.w800,
+        fontSize: 12,
+      ),
+    );
+  }
+}
+
+class _ReminderPanel extends StatelessWidget {
+  const _ReminderPanel({
+    required this.reminderOn,
+    required this.reminderBeforeMinutes,
+    required this.refillReminderOn,
+    required this.stockController,
+    required this.refillThresholdController,
+    required this.onReminderChanged,
+    required this.onRefillChanged,
+    required this.onMinuteChanged,
+  });
+
+  final bool reminderOn;
+  final int reminderBeforeMinutes;
+  final bool refillReminderOn;
+  final TextEditingController stockController;
+  final TextEditingController refillThresholdController;
+  final ValueChanged<bool> onReminderChanged;
+  final ValueChanged<bool> onRefillChanged;
+  final ValueChanged<int> onMinuteChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Eslatma',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              Switch(value: reminderOn, onChanged: onReminderChanged),
+            ],
+          ),
+          Wrap(
+            spacing: 8,
+            children: [0, 5, 10, 30]
+                .map(
+                  (minute) => _SegmentPill(
+                    label: minute == 0 ? 'vaqtida' : '$minute min',
+                    selected: reminderBeforeMinutes == minute,
+                    onTap: () => onMinuteChanged(minute),
+                  ),
+                )
+                .toList(),
+          ),
+          const Divider(height: 18),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Dori tugashini eslatish',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              Switch(value: refillReminderOn, onChanged: onRefillChanged),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: _MiniNumberField(
+                  controller: stockController,
+                  label: 'Qoldi',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MiniNumberField(
+                  controller: refillThresholdController,
+                  label: 'Chegara',
+                  enabled: refillReminderOn,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniNumberField extends StatelessWidget {
+  const _MiniNumberField({
+    required this.controller,
+    required this.label,
+    this.enabled = true,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surface,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(9),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
 }
 
 class _OfflineQueueBanner extends StatelessWidget {
@@ -953,71 +1243,6 @@ class _OfflineQueueBanner extends StatelessWidget {
   );
 }
 
-class _DarkInput extends StatelessWidget {
-  const _DarkInput({
-    this.controller,
-    required this.label,
-    required this.hint,
-    this.error,
-    this.suffix,
-    this.minLines = 1,
-  });
-  final TextEditingController? controller;
-  final String label;
-  final String hint;
-  final String? error;
-  final IconData? suffix;
-  final int minLines;
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        label,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-      const SizedBox(height: 8),
-      TextField(
-        controller: controller,
-        minLines: minLines,
-        maxLines: minLines,
-        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          suffixIcon: suffix == null
-              ? null
-              : Icon(
-                  suffix,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          fillColor: Theme.of(context).inputDecorationTheme.fillColor,
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(
-              color: error == null ? Colors.transparent : AppColors.error,
-            ),
-          ),
-        ),
-      ),
-      if (error != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 5),
-          child: Text(
-            error!,
-            style: const TextStyle(color: AppColors.error, fontSize: 12),
-          ),
-        ),
-    ],
-  );
-}
-
 class _ChoicePill extends StatelessWidget {
   const _ChoicePill({required this.label, this.selected = false, this.onTap});
   final String label;
@@ -1026,69 +1251,6 @@ class _ChoicePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       AppChip(label: label, selected: selected, onTap: onTap);
-}
-
-class _DateBox extends StatelessWidget {
-  const _DateBox({
-    required this.label,
-    required this.value,
-    required this.onTap,
-    this.onClear,
-  });
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-  final VoidCallback? onClear;
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(10),
-    child: Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color:
-            Theme.of(context).inputDecorationTheme.fillColor ??
-            Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ],
-            ),
-          ),
-          if (onClear != null)
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              onPressed: onClear,
-              icon: const Icon(Icons.close, size: 16),
-            )
-          else
-            Icon(
-              Icons.calendar_month,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              size: 18,
-            ),
-        ],
-      ),
-    ),
-  );
 }
 
 class _IntervalTile extends StatelessWidget {

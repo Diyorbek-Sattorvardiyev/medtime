@@ -21,15 +21,38 @@ class _AppShellState extends State<AppShell> {
   var _index = 0;
   late final List<Widget> _pages = [
     const HomeScreen(),
-    MedicineListScreen(onAddTap: () => _setIndex(2)),
-    const AddMedicineScreen(),
+    MedicineListScreen(onAddTap: _openAddMedicineSheet),
+    const SizedBox.shrink(),
     const StatisticsScreen(),
     const ProfileScreen(),
   ];
 
   void _setIndex(int value) {
+    if (value == 2) {
+      _openAddMedicineSheet();
+      return;
+    }
     if (_index == value) return;
     setState(() => _index = value);
+  }
+
+  Future<void> _openAddMedicineSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final topGap = MediaQuery.paddingOf(context).top + kToolbarHeight + 10;
+        return Padding(
+          padding: EdgeInsets.only(top: topGap),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            child: const AddMedicineScreen(),
+          ),
+        );
+      },
+    );
   }
 
   @override

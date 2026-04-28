@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'tashkent_time.dart';
 
 enum MedicineStatus { pending, taken, later, missed }
 
@@ -9,6 +10,7 @@ class Medicine {
     this.id,
     this.scheduleId,
     this.plannedAt,
+    this.imageUrl,
     required this.name,
     required this.dose,
     required this.time,
@@ -19,6 +21,7 @@ class Medicine {
   final int? id;
   final int? scheduleId;
   final String? plannedAt;
+  final String? imageUrl;
   final String name;
   final String dose;
   final String time;
@@ -31,6 +34,7 @@ class Medicine {
       id: id,
       scheduleId: scheduleId,
       plannedAt: plannedAt,
+      imageUrl: imageUrl,
       name: name,
       dose: dose,
       time: time,
@@ -56,6 +60,7 @@ class Medicine {
       id: _intFrom(json['id'] ?? json['medicine_id']),
       scheduleId: _intFrom(schedule['id'] ?? schedule['schedule_id']),
       plannedAt: plannedAt,
+      imageUrl: (json['image_url'] ?? json['image_path'])?.toString(),
       name: (json['name'] ?? json['medicine_name'] ?? 'Dori').toString(),
       dose: (json['dosage'] ?? json['dose'] ?? '').toString(),
       time: _displayTime(
@@ -70,7 +75,7 @@ class Medicine {
 String? _todayPlannedAt(Object? time) {
   final text = time?.toString();
   if (text == null || text.length < 5 || !text.contains(':')) return null;
-  final now = DateTime.now();
+  final now = tashkentNow();
   return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}T${text.substring(0, 5)}:00';
 }
 

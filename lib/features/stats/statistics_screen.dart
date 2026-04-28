@@ -43,83 +43,73 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 116),
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Statistika',
-                      style: Theme.of(context).textTheme.headlineLarge,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Sizning dori qabul qilish holatingiz',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton.filledTonal(
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRoutes.calendar),
-                icon: const Icon(Icons.calendar_month_outlined),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _SegmentedRange(
-            value: _range,
-            onChanged: (value) {
-              setState(() => _range = value);
-              _loadStats();
-            },
-          ),
-          const SizedBox(height: 16),
-          if (_loading)
-            const Center(child: CircularProgressIndicator())
-          else if (_error != null)
-            TextButton(onPressed: _loadStats, child: Text(_error!))
-          else
-            _SummaryCard(stats: _stats),
-          const SizedBox(height: 20),
-          _ChartCard(stats: _stats),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _MetricTile(
-                  icon: Icons.check_circle,
-                  color: AppColors.primary,
-                  value: '${_count(_stats, 'taken')}',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _MetricTile(
-                  icon: Icons.cancel,
-                  color: AppColors.error,
-                  value: '${_count(_stats, 'missed')}',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _MetricTile(
-                  icon: Icons.schedule,
-                  color: AppColors.accent,
-                  value: '${_count(_stats, 'pending')}',
-                ),
-              ),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Statistika'),
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.calendar),
+            icon: const Icon(Icons.calendar_month_outlined),
           ),
         ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 116),
+          children: [
+            Text(
+              'Sizning dori qabul qilish holatingiz',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _SegmentedRange(
+              value: _range,
+              onChanged: (value) {
+                setState(() => _range = value);
+                _loadStats();
+              },
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Center(child: CircularProgressIndicator())
+            else if (_error != null)
+              TextButton(onPressed: _loadStats, child: Text(_error!))
+            else
+              _SummaryCard(stats: _stats),
+            const SizedBox(height: 20),
+            _ChartCard(stats: _stats),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _MetricTile(
+                    icon: Icons.check_circle,
+                    color: AppColors.primary,
+                    value: '${_count(_stats, 'taken')}',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _MetricTile(
+                    icon: Icons.cancel,
+                    color: AppColors.error,
+                    value: '${_count(_stats, 'missed')}',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _MetricTile(
+                    icon: Icons.schedule,
+                    color: AppColors.accent,
+                    value: '${_count(_stats, 'pending')}',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

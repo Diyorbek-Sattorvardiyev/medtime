@@ -16,6 +16,7 @@ class MedicineSchema(Schema):
     family_member_id = fields.Int(allow_none=True)
     name = fields.Str(required=True, validate=validate.Length(min=1, max=160))
     dosage = fields.Str(required=True, validate=validate.Length(min=1, max=120))
+    image_url = fields.Str(required=True, validate=validate.Length(min=1, max=500))
     intake_type = fields.Str(required=True, validate=validate.OneOf(sorted(VALID_INTAKE_TYPES)))
     notes = fields.Str(allow_none=True)
     stock_quantity = fields.Int(allow_none=True, validate=validate.Range(min=0, max=100000))

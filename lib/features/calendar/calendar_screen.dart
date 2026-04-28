@@ -42,55 +42,38 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kalendar'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: _goToday,
-            icon: const Icon(Icons.today_outlined),
-          ),
-        ],
-      ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(title: const Text('Kalendar')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 116),
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Kalendar',
-                        style: Theme.of(context).textTheme.headlineLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Dorilar jadvali',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+            _AnimatedEntry(
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: _previousMonth,
+                    icon: const Icon(Icons.chevron_left_rounded),
                   ),
-                ),
-                FilledButton.tonal(
-                  onPressed: _goToday,
-                  child: const Text('Today'),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  onPressed: _loadCalendar,
-                  icon: const Icon(Icons.calendar_month_outlined),
-                ),
-              ],
+                  Expanded(
+                    child: Text(
+                      '${_month.month.toString().padLeft(2, '0')}.${_month.year}',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _nextMonth,
+                    icon: const Icon(Icons.chevron_right_rounded),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 18),
-            AppCard(
-              radius: 22,
-              padding: const EdgeInsets.all(10),
+            const SizedBox(height: 6),
+            _AnimatedEntry(
+              delay: 80,
               child: TableCalendar<Map<String, dynamic>>(
                 firstDay: DateTime(DateTime.now().year - 2),
                 lastDay: DateTime(DateTime.now().year + 2, 12, 31),
@@ -124,15 +107,32 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   });
                   _loadCalendar();
                 },
+                daysOfWeekHeight: 30,
+                rowHeight: 36,
                 headerStyle: const HeaderStyle(
-                  titleCentered: true,
+                  headerMargin: EdgeInsets.only(bottom: 2),
+                  titleTextStyle: TextStyle(fontSize: 0),
+                  leftChevronVisible: false,
+                  rightChevronVisible: false,
                   formatButtonVisible: false,
-                  leftChevronIcon: Icon(Icons.chevron_left),
-                  rightChevronIcon: Icon(Icons.chevron_right),
                 ),
                 calendarStyle: CalendarStyle(
-                  todayDecoration: BoxDecoration(
-                    border: Border.all(color: AppColors.primary, width: 2),
+                  defaultTextStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  weekendTextStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                  ),
+                  outsideTextStyle: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black.withValues(alpha: 0.18),
+                  ),
+                  todayDecoration: const BoxDecoration(
+                    color: AppColors.successSoft,
                     shape: BoxShape.circle,
                   ),
                   selectedDecoration: const BoxDecoration(
@@ -143,9 +143,33 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     color: AppColors.accent,
                     shape: BoxShape.circle,
                   ),
-                  outsideDaysVisible: false,
+                  selectedTextStyle: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  todayTextStyle: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  outsideDaysVisible: true,
+                ),
+                daysOfWeekStyle: DaysOfWeekStyle(
+                  weekdayStyle: TextStyle(
+                    fontSize: 11,
+                    color: Colors.black.withValues(alpha: 0.45),
+                    fontWeight: FontWeight.w700,
+                  ),
+                  weekendStyle: TextStyle(
+                    fontSize: 11,
+                    color: Colors.black.withValues(alpha: 0.45),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 calendarBuilders: CalendarBuilders(
+                  defaultBuilder: _calendarDayBuilder,
+                  selectedBuilder: _calendarDayBuilder,
+                  todayBuilder: _calendarDayBuilder,
+                  outsideBuilder: _calendarDayBuilder,
                   markerBuilder: (context, day, events) {
                     final status = _statusForDate(day);
                     if (status == null) return const SizedBox.shrink();
@@ -164,30 +188,69 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Bugungi dorilar',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             if (_loading)
-              const Center(child: CircularProgressIndicator())
+              const _CalendarSkeleton()
             else if (_error != null)
               TextButton(onPressed: _loadCalendar, child: Text(_error!))
             else if (_items.isEmpty)
               const _CalendarEmptyState()
-            else
-              ..._items.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _CalendarMedicine(
-                    name: (item['name'] ?? 'Dori').toString(),
-                    subtitle: _itemTime(item),
-                    status: _statusFrom(item['status']),
+            else ...[
+              _AnimatedEntry(
+                delay: 120,
+                child: _SelectedDayPreview(
+                  item: _items.first,
+                  onTap: () => _openMedicine(_items.first),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ..._items.asMap().entries.map(
+                (entry) => _AnimatedEntry(
+                  delay: 160 + entry.key * 55,
+                  child: _TimelineMedicine(
+                    item: entry.value,
+                    status: _statusFrom(entry.value['status']),
+                    onTap: () => _openMedicine(entry.value),
                   ),
                 ),
               ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget? _calendarDayBuilder(
+    BuildContext context,
+    DateTime day,
+    DateTime focusedDay,
+  ) {
+    final status = _statusForDate(day);
+    final selected =
+        day.year == _month.year &&
+        day.month == _month.month &&
+        day.day == _selectedDay;
+    if (status == null && !selected) return null;
+    final color = selected
+        ? AppColors.primary
+        : status == null
+        ? Colors.transparent
+        : statusColor(status);
+    return Center(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        child: Text(
+          '${day.day}',
+          style: TextStyle(
+            color: selected || status != null ? Colors.white : Colors.black,
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
+          ),
         ),
       ),
     );
@@ -250,13 +313,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  void _goToday() {
-    final now = DateTime.now();
+  void _previousMonth() {
     setState(() {
-      _month = DateTime(now.year, now.month);
-      _selectedDay = now.day;
+      _month = DateTime(_month.year, _month.month - 1);
+      _selectedDay = 1;
     });
     _loadCalendar();
+  }
+
+  void _nextMonth() {
+    setState(() {
+      _month = DateTime(_month.year, _month.month + 1);
+      _selectedDay = 1;
+    });
+    _loadCalendar();
+  }
+
+  void _openMedicine(Map<String, dynamic> item) {
+    final id = _int(item['id'] ?? item['medicine_id']);
+    if (id == 0) return;
+    Navigator.pushNamed(context, AppRoutes.details, arguments: id);
   }
 
   String get _selectedDate {
@@ -290,49 +366,283 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 }
 
-class _CalendarMedicine extends StatelessWidget {
-  const _CalendarMedicine({
-    required this.name,
-    required this.subtitle,
-    required this.status,
-  });
-  final String name;
-  final String subtitle;
-  final MedicineStatus status;
+class _SelectedDayPreview extends StatelessWidget {
+  const _SelectedDayPreview({required this.item, required this.onTap});
+
+  final Map<String, dynamic> item;
+  final VoidCallback onTap;
+
   @override
-  Widget build(BuildContext context) => AppCard(
-    radius: 14,
-    padding: const EdgeInsets.all(10),
-    child: Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.border.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(10),
+  Widget build(BuildContext context) {
+    final status = _CalendarScreenState._statusFrom(item['status']);
+    return AppCard(
+      radius: 14,
+      padding: const EdgeInsets.all(10),
+      onTap: onTap,
+      child: Row(
+        children: [
+          _MedicineIcon(status: status, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  (item['name'] ?? 'Paracetamol').toString(),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  statusLabel(status),
+                  style: TextStyle(
+                    color: statusColor(status),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
           ),
-          child: const Icon(Icons.medication_outlined),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(name, style: Theme.of(context).textTheme.titleMedium),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+          const Icon(Icons.chevron_right_rounded, color: AppColors.mutedText),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimelineMedicine extends StatelessWidget {
+  const _TimelineMedicine({
+    required this.item,
+    required this.status,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> item;
+  final MedicineStatus status;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 44,
+            child: Column(
+              children: [
+                Text(
+                  _monthLabel(item['planned_at']),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  _yearLabel(item['planned_at']),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.black.withValues(alpha: 0.45),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 9,
+            height: 9,
+            margin: const EdgeInsets.only(top: 5, right: 8),
+            decoration: BoxDecoration(
+              color: statusColor(status),
+              shape: BoxShape.circle,
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    _MedicineIcon(status: status, size: 28),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            (item['name'] ?? 'Paracetamol').toString(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            _CalendarScreenState._itemTime(item),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _StatusPill(status: status),
+                  ],
                 ),
               ),
-            ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _monthLabel(Object? value) {
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    const labels = [
+      'Jan.',
+      'Feb.',
+      'Mar.',
+      'Apr.',
+      'May.',
+      'Jun.',
+      'Jul.',
+      'Aug.',
+      'Sep.',
+      'Oct.',
+      'Nov.',
+      'Dec.',
+    ];
+    if (parsed == null) return 'Jan.';
+    return labels[parsed.month - 1];
+  }
+
+  static String _yearLabel(Object? value) {
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    return parsed?.year.toString() ?? '';
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.status});
+
+  final MedicineStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: statusColor(status).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        statusLabel(status),
+        style: TextStyle(
+          color: statusColor(status),
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _MedicineIcon extends StatelessWidget {
+  const _MedicineIcon({required this.status, required this.size});
+
+  final MedicineStatus status;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size + 14,
+      height: size + 14,
+      decoration: BoxDecoration(
+        color: statusColor(status).withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Icon(
+        Icons.medication_outlined,
+        color: statusColor(status),
+        size: size,
+      ),
+    );
+  }
+}
+
+class _AnimatedEntry extends StatelessWidget {
+  const _AnimatedEntry({required this.child, this.delay = 0});
+
+  final Widget child;
+  final int delay;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 320 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 18 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _CalendarSkeleton extends StatelessWidget {
+  const _CalendarSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(
+        3,
+        (index) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: AppCard(
+            radius: 14,
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Container(
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        Icon(statusIcon(status), color: statusColor(status), size: 30),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _CalendarEmptyState extends StatelessWidget {

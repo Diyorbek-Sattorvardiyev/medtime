@@ -1,3 +1,84 @@
-<p>Assalomu alaykum, {{ user.full_name }}.</p>
-<p><strong>{{ medicine.name }}</strong> ({{ medicine.dosage }}) qabul qilish vaqti: {{ planned_at.strftime("%Y-%m-%d %H:%M") }}.</p>
-<p>MedReminder</p>
+<div style="margin:0;padding:0;background:#F8FAFC;font-family:Arial,Helvetica,sans-serif;color:#0F172A;">
+    <div style="max-width:560px;margin:0 auto;padding:28px 16px;">
+
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#22C55E,#3B82F6);border-radius:24px 24px 0 0;padding:28px;text-align:center;">
+
+            <!-- Icon -->
+            <div style="margin-bottom:12px;">
+                <svg width="48" height="48" fill="white" viewBox="0 0 24 24">
+                    <path d="M19 8l-7 7-7-7 1.41-1.41L12 12.17l5.59-5.58z"/>
+                </svg>
+            </div>
+
+            <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;">
+                MedReminder
+            </h1>
+
+            <p style="margin:8px 0 0;color:#DCFCE7;font-size:15px;">
+                Dori qabul qilish vaqti keldi
+            </p>
+        </div>
+
+        <!-- Body -->
+        <div style="background:#ffffff;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 24px 24px;padding:28px;box-shadow:0 12px 30px rgba(15,23,42,0.08);">
+
+            <!-- Greeting -->
+            <p style="margin:0 0 18px;font-size:18px;line-height:1.6;">
+                Assalomu alaykum,
+                <strong>{{ user.full_name }}</strong>
+            </p>
+
+            <!-- Medicine Card -->
+            <div style="background:#DCFCE7;border:1px solid #86EFAC;border-radius:20px;padding:20px;margin-bottom:22px;">
+
+                <div style="display:flex;align-items:center;margin-bottom:8px;">
+                    <svg width="20" height="20" fill="#22C55E" viewBox="0 0 24 24" style="margin-right:8px;">
+                        <path d="M19 8l-7 7-7-7"/>
+                    </svg>
+                    <span style="color:#64748B;font-size:14px;font-weight:600;">Dori nomi</span>
+                </div>
+
+                <h2 style="margin:0;color:#0F172A;font-size:24px;font-weight:800;">
+                    {{ medicine.name }}
+                </h2>
+
+                <p style="margin:8px 0 0;color:#166534;font-size:16px;font-weight:700;">
+                    Dozasi: {{ medicine.dosage }}
+                </p>
+            </div>
+
+            <!-- Time Card -->
+            <div style="background:#FEF9C3;border:1px solid #FACC15;border-radius:18px;padding:18px;margin-bottom:22px;">
+
+                <div style="display:flex;align-items:center;margin-bottom:6px;">
+                    <svg width="20" height="20" fill="#FACC15" viewBox="0 0 24 24" style="margin-right:8px;">
+                        <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 11h-4V7h2v4h2v2z"/>
+                    </svg>
+                    <span style="color:#64748B;font-size:14px;font-weight:600;">Qabul qilish vaqti</span>
+                </div>
+
+                <p style="margin:0;color:#0F172A;font-size:20px;font-weight:800;">
+                    {{ planned_at.strftime("%Y-%m-%d %H:%M") }}
+                </p>
+            </div>
+
+            <!-- Button -->
+            <div style="text-align:center;margin-top:26px;">
+                <div style="display:inline-block;background:#22C55E;color:#ffffff;padding:14px 24px;border-radius:999px;font-size:15px;font-weight:800;">
+                    Dorini vaqtida qabul qilishni unutmang
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <p style="margin:26px 0 0;text-align:center;color:#64748B;font-size:13px;">
+                Ushbu xabar MedReminder tomonidan yuborildi
+            </p>
+        </div>
+
+        <p style="margin:18px 0 0;text-align:center;color:#64748B;font-size:12px;">
+            © MedReminder
+        </p>
+
+    </div>
+</div>

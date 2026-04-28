@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,11 +14,12 @@ import '../../core/storage/offline_action_queue.dart';
 import '../../core/utils/app_events.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_card.dart';
-import '../../widgets/app_chip.dart';
 
 enum _MedicineViewState { content, empty, error, loading }
 
 enum _SortBy { time, name }
+
+enum _TimeFilter { morning, afternoon, evening }
 
 class MedicineListScreen extends StatefulWidget {
   const MedicineListScreen({super.key, this.onAddTap});
@@ -42,6 +44,7 @@ class _MedicineListScreenState extends State<MedicineListScreen>
     MedicineStatus.missed,
     MedicineStatus.pending,
   };
+  final _selectedTimes = <_TimeFilter>{};
 
   var _sortBy = _SortBy.time;
   var _viewState = _MedicineViewState.loading;
@@ -87,7 +90,10 @@ class _MedicineListScreenState extends State<MedicineListScreen>
       final matchesQuery =
           query.isEmpty || medicine.name.toLowerCase().contains(query);
       final matchesStatus = _selectedStatuses.contains(medicine.status);
-      return matchesQuery && matchesStatus;
+      final matchesTime =
+          _selectedTimes.isEmpty ||
+          _selectedTimes.contains(_timeFilterFor(medicine.time));
+      return matchesQuery && matchesStatus && matchesTime;
     }).toList();
 
     filtered.sort((a, b) {
@@ -103,51 +109,59 @@ class _MedicineListScreenState extends State<MedicineListScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 116),
-        children: [
-          _Header(
-            onFilter: _showFilterSheet,
-            onSearchTap: () => _searchFocus.requestFocus(),
-            onStateTap: _cyclePreviewState,
-          ),
-          const SizedBox(height: 22),
-          _SearchField(
-            controller: _searchController,
-            focusNode: _searchFocus,
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 24),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 240),
-            child: switch (_viewState) {
-              _MedicineViewState.loading => const _SkeletonList(
-                key: ValueKey('loading'),
-              ),
-              _MedicineViewState.error => _ErrorState(
-                key: const ValueKey('error'),
-                message: _error,
-                onRetry: () => _loadMedicines(showLoading: true),
-              ),
-              _MedicineViewState.empty => _EmptyState(
-                key: const ValueKey('empty'),
-                onTap: widget.onAddTap ?? () {},
-              ),
-              _MedicineViewState.content => _MedicineContent(
-                key: const ValueKey('content'),
-                medicines: _visibleMedicines,
-                onAddTap: widget.onAddTap ?? () {},
-                onTap: (medicine) => Navigator.pushNamed(
-                  context,
-                  AppRoutes.details,
-                  arguments: medicine.id,
-                ),
-                onStatusChanged: _updateStatus,
-              ),
-            },
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Dorilar ro'yxati"),
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            onPressed: _showFilterSheet,
+            onLongPress: _cyclePreviewState,
+            icon: const Icon(Icons.tune_rounded),
           ),
         ],
+      ),
+      body: ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 116),
+          children: [
+            _SearchField(
+              controller: _searchController,
+              focusNode: _searchFocus,
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 18),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 240),
+              child: switch (_viewState) {
+                _MedicineViewState.loading => const _SkeletonList(
+                  key: ValueKey('loading'),
+                ),
+                _MedicineViewState.error => _ErrorState(
+                  key: const ValueKey('error'),
+                  message: _error,
+                  onRetry: () => _loadMedicines(showLoading: true),
+                ),
+                _MedicineViewState.empty => _EmptyState(
+                  key: const ValueKey('empty'),
+                  onTap: widget.onAddTap ?? () {},
+                ),
+                _MedicineViewState.content => _MedicineContent(
+                  key: const ValueKey('content'),
+                  medicines: _visibleMedicines,
+                  onAddTap: widget.onAddTap ?? () {},
+                  onTap: (medicine) => Navigator.pushNamed(
+                    context,
+                    AppRoutes.details,
+                    arguments: medicine.id,
+                  ),
+                  onStatusChanged: _updateStatus,
+                ),
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -274,6 +288,7 @@ class _MedicineListScreenState extends State<MedicineListScreen>
   void _showFilterSheet() {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
@@ -298,70 +313,118 @@ class _MedicineListScreenState extends State<MedicineListScreen>
               setSheetState(() {});
             }
 
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Filter',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 14),
-                  _FilterStatusTile(
-                    status: MedicineStatus.pending,
-                    selected: _selectedStatuses.contains(
-                      MedicineStatus.pending,
+            void toggleTime(_TimeFilter value) {
+              setState(() {
+                if (_selectedTimes.contains(value)) {
+                  _selectedTimes.remove(value);
+                } else {
+                  _selectedTimes.add(value);
+                }
+              });
+              setSheetState(() {});
+            }
+
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  6,
+                  16,
+                  28 + MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
                     ),
-                    onTap: () => toggleStatus(MedicineStatus.pending),
-                  ),
-                  _FilterStatusTile(
-                    status: MedicineStatus.taken,
-                    selected: _selectedStatuses.contains(MedicineStatus.taken),
-                    onTap: () => toggleStatus(MedicineStatus.taken),
-                  ),
-                  _FilterStatusTile(
-                    status: MedicineStatus.later,
-                    selected: _selectedStatuses.contains(MedicineStatus.later),
-                    onTap: () => toggleStatus(MedicineStatus.later),
-                  ),
-                  _FilterStatusTile(
-                    status: MedicineStatus.missed,
-                    selected: _selectedStatuses.contains(MedicineStatus.missed),
-                    onTap: () => toggleStatus(MedicineStatus.missed),
-                  ),
-                  const Divider(height: 24),
-                  Text(
-                    'Time-of-day',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    children: const [
-                      _TimeChip(label: 'ertalab'),
-                      _TimeChip(label: 'tush'),
-                      _TimeChip(label: 'kechqurun'),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Sorting by',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  _SortTile(
-                    label: 'Time',
-                    selected: _sortBy == _SortBy.time,
-                    onTap: () => setSort(_SortBy.time),
-                  ),
-                  _SortTile(
-                    label: 'Name',
-                    selected: _sortBy == _SortBy.name,
-                    onTap: () => setSort(_SortBy.name),
-                  ),
-                ],
+                    Text(
+                      'Filtr',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _FilterStatusTile(
+                      status: MedicineStatus.pending,
+                      selected: _selectedStatuses.contains(
+                        MedicineStatus.pending,
+                      ),
+                      onTap: () => toggleStatus(MedicineStatus.pending),
+                    ),
+                    _FilterStatusTile(
+                      status: MedicineStatus.taken,
+                      selected: _selectedStatuses.contains(
+                        MedicineStatus.taken,
+                      ),
+                      onTap: () => toggleStatus(MedicineStatus.taken),
+                    ),
+                    _FilterStatusTile(
+                      status: MedicineStatus.missed,
+                      selected: _selectedStatuses.contains(
+                        MedicineStatus.missed,
+                      ),
+                      onTap: () => toggleStatus(MedicineStatus.missed),
+                    ),
+                    const Divider(height: 24),
+                    Text(
+                      'Kun vaqti',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        _TimeChip(
+                          label: 'ertalab',
+                          selected: _selectedTimes.contains(
+                            _TimeFilter.morning,
+                          ),
+                          onTap: () => toggleTime(_TimeFilter.morning),
+                        ),
+                        _TimeChip(
+                          label: 'tush',
+                          selected: _selectedTimes.contains(
+                            _TimeFilter.afternoon,
+                          ),
+                          onTap: () => toggleTime(_TimeFilter.afternoon),
+                        ),
+                        _TimeChip(
+                          label: 'kechqurun',
+                          selected: _selectedTimes.contains(
+                            _TimeFilter.evening,
+                          ),
+                          onTap: () => toggleTime(_TimeFilter.evening),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Saralash',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    _SortTile(
+                      label: 'Vaqt',
+                      selected: _sortBy == _SortBy.time,
+                      onTap: () => setSort(_SortBy.time),
+                    ),
+                    _SortTile(
+                      label: 'Nomi',
+                      selected: _sortBy == _SortBy.name,
+                      onTap: () => setSort(_SortBy.name),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -369,55 +432,12 @@ class _MedicineListScreenState extends State<MedicineListScreen>
       },
     );
   }
-}
 
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.onFilter,
-    required this.onSearchTap,
-    required this.onStateTap,
-  });
-
-  final VoidCallback onFilter;
-  final VoidCallback onSearchTap;
-  final VoidCallback onStateTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Dorilarim',
-                style: Theme.of(
-                  context,
-                ).textTheme.headlineLarge?.copyWith(fontSize: 34),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                "Barcha dorilar ro'yxati",
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-        IconButton(
-          onPressed: onSearchTap,
-          icon: const Icon(Icons.search_rounded, size: 32),
-        ),
-        IconButton(
-          onPressed: onFilter,
-          onLongPress: onStateTap,
-          icon: const Icon(Icons.tune_rounded, size: 30),
-        ),
-      ],
-    );
+  _TimeFilter _timeFilterFor(String value) {
+    final hour = int.tryParse(value.split(':').first) ?? 0;
+    if (hour < 12) return _TimeFilter.morning;
+    if (hour < 18) return _TimeFilter.afternoon;
+    return _TimeFilter.evening;
   }
 }
 
@@ -436,18 +456,23 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        borderRadius: BorderRadius.all(Radius.circular(16)),
+        borderRadius: BorderRadius.all(Radius.circular(13)),
         boxShadow: AppColors.softShadow,
       ),
       child: TextField(
         controller: controller,
         focusNode: focusNode,
         onChanged: onChanged,
-        decoration: const InputDecoration(
-          prefixIcon: Icon(Icons.search_rounded, size: 28),
+        style: const TextStyle(fontSize: 15),
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.search_rounded, size: 28),
           hintText: 'Dori nomini qidirish...',
           filled: true,
-          fillColor: AppColors.surface,
+          fillColor: Theme.of(context).colorScheme.surface,
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 14,
+            horizontal: 14,
+          ),
         ),
       ),
     );
@@ -477,14 +502,19 @@ class _MedicineContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...medicines.map(
-          (medicine) => Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: _MedicineCard(
-              medicine: medicine,
-              onTap: () => onTap(medicine),
-              onTaken: () => onStatusChanged(medicine, MedicineStatus.taken),
-              onMissed: () => onStatusChanged(medicine, MedicineStatus.missed),
+        ...medicines.asMap().entries.map(
+          (entry) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _AnimatedListItem(
+              index: entry.key,
+              child: _MedicineCard(
+                medicine: entry.value,
+                onTap: () => onTap(entry.value),
+                onTaken: () =>
+                    onStatusChanged(entry.value, MedicineStatus.taken),
+                onMissed: () =>
+                    onStatusChanged(entry.value, MedicineStatus.missed),
+              ),
             ),
           ),
         ),
@@ -532,87 +562,37 @@ class _MedicineCard extends StatelessWidget {
       ),
       child: AppCard(
         onTap: onTap,
-        radius: 16,
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-        child: Column(
+        radius: 9,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: AppColors.successSoft,
-                    borderRadius: BorderRadius.circular(29),
-                  ),
-                  child: const Icon(
-                    Icons.medication_outlined,
-                    color: AppColors.primary,
-                    size: 30,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        medicine.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.headlineMedium?.copyWith(fontSize: 21),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        medicine.dose,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _StatusBadge(status: medicine.status),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: switch (medicine.status) {
-                        MedicineStatus.pending => 0.18,
-                        MedicineStatus.taken => 0.72,
-                        MedicineStatus.later => 0.46,
-                        MedicineStatus.missed => 0.66,
-                      },
-                      minHeight: 6,
-                      color: statusColor(medicine.status),
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.outlineVariant,
+            _MedicineThumb(imageUrl: medicine.imageUrl),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    medicine.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      height: 1.05,
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Icon(
-                  Icons.access_time_filled,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  size: 15,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  medicine.time,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 4),
+                  Text(
+                    medicine.time,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+            _StatusBadge(status: medicine.status),
           ],
         ),
       ),
@@ -628,26 +608,103 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: statusColor(status).withValues(alpha: 0.16),
+        color: statusColor(status),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(statusIcon(status), color: statusColor(status), size: 17),
+          Icon(statusIcon(status), color: Colors.white, size: 14),
           const SizedBox(width: 5),
           Text(
             statusLabel(status),
             style: TextStyle(
-              color: statusColor(status),
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AnimatedListItem extends StatelessWidget {
+  const _AnimatedListItem({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 260 + index * 45),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 14 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _MedicineFallback extends StatelessWidget {
+  const _MedicineFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.successSoft,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(
+        Icons.medication_outlined,
+        color: AppColors.primary,
+        size: 24,
+      ),
+    );
+  }
+}
+
+class _MedicineThumb extends StatelessWidget {
+  const _MedicineThumb({required this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = imageUrl?.trim() ?? '';
+    if (value.isEmpty) return const _MedicineFallback();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: value.startsWith('http://') || value.startsWith('https://')
+          ? Image.network(
+              value,
+              width: 42,
+              height: 42,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const _MedicineFallback(),
+            )
+          : Image.file(
+              File(value),
+              width: 42,
+              height: 42,
+              cacheWidth: 84,
+              cacheHeight: 84,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const _MedicineFallback(),
+            ),
     );
   }
 }
@@ -740,13 +797,40 @@ class _FilterStatusTile extends StatelessWidget {
 }
 
 class _TimeChip extends StatelessWidget {
-  const _TimeChip({required this.label});
+  const _TimeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return AppChip(label: label, icon: Icons.schedule_outlined);
+    return ActionChip(
+      onPressed: onTap,
+      avatar: selected
+          ? const Icon(Icons.check, size: 15, color: AppColors.primary)
+          : null,
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+      side: BorderSide(
+        color: selected
+            ? AppColors.primary.withValues(alpha: 0.35)
+            : Colors.transparent,
+      ),
+      backgroundColor: selected
+          ? AppColors.successSoft
+          : Theme.of(context).colorScheme.surfaceContainerHighest,
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.w700,
+        color: selected
+            ? AppColors.primary
+            : Theme.of(context).colorScheme.onSurface,
+      ),
+    );
   }
 }
 
@@ -896,14 +980,14 @@ class _SkeletonList extends StatelessWidget {
       children: List.generate(
         4,
         (index) => Padding(
-          padding: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.only(bottom: 7),
           child: AppCard(
-            radius: 16,
-            padding: const EdgeInsets.all(14),
+            radius: 12,
+            padding: const EdgeInsets.all(10),
             child: Row(
               children: [
-                _SkeletonBox(width: 58, height: 58, radius: 12),
-                const SizedBox(width: 12),
+                _SkeletonBox(width: 48, height: 48, radius: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -913,14 +997,14 @@ class _SkeletonList extends StatelessWidget {
                         height: 12,
                         radius: 8,
                       ),
-                      SizedBox(height: 10),
+                      SizedBox(height: 7),
                       _SkeletonBox(width: 150, height: 10, radius: 8),
-                      SizedBox(height: 10),
+                      SizedBox(height: 7),
                       _SkeletonBox(width: 190, height: 8, radius: 8),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 _SkeletonBox(width: 58, height: 24, radius: 12),
               ],
             ),

@@ -30,25 +30,45 @@ class _NotificationScreenState extends State<NotificationScreen> {
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(strings.notifications)),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-        children: [
-          if (_loading)
-            const Center(child: CircularProgressIndicator())
-          else if (_error != null)
-            TextButton(onPressed: _loadNotifications, child: Text(_error!))
-          else if (_items.isEmpty)
-            const _NotificationEmpty()
-          else
-            ..._items.map(
-              (item) => _HistoryTile(
-                title: (item['title'] ?? 'Notification').toString(),
-                subtitle: '${item['body'] ?? ''}\n${item['created_at'] ?? ''}',
-                status: _statusFrom(item['channel']),
-              ),
-            ),
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(strings.notifications),
+        actions: [
+          IconButton(
+            tooltip: 'Yangilash',
+            onPressed: _loading ? null : _loadNotifications,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
         ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadNotifications,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+          children: [
+            if (_loading)
+              const _NotificationSkeleton()
+            else if (_error != null)
+              _NotificationError(message: _error!, onRetry: _loadNotifications)
+            else if (_items.isEmpty)
+              const _NotificationEmpty()
+            else
+              ..._items.asMap().entries.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _NotificationTile(
+                    index: entry.key,
+                    title: (entry.value['title'] ?? 'Bildirishnoma').toString(),
+                    body: (entry.value['body'] ?? '').toString(),
+                    date: _formatDate(entry.value['created_at']),
+                    status: _statusFrom(
+                      entry.value['status'] ?? entry.value['channel'],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -81,36 +101,198 @@ class _NotificationScreenState extends State<NotificationScreen> {
       _ => MedicineStatus.pending,
     };
   }
+
+  static String _formatDate(Object? value) {
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    if (parsed == null) return value?.toString() ?? '';
+    final day = parsed.day.toString().padLeft(2, '0');
+    final month = parsed.month.toString().padLeft(2, '0');
+    final hour = parsed.hour.toString().padLeft(2, '0');
+    final minute = parsed.minute.toString().padLeft(2, '0');
+    return '$day.$month.${parsed.year}  $hour:$minute';
+  }
 }
 
-class _HistoryTile extends StatelessWidget {
-  const _HistoryTile({
+class _NotificationTile extends StatelessWidget {
+  const _NotificationTile({
+    required this.index,
     required this.title,
-    required this.subtitle,
+    required this.body,
+    required this.date,
     required this.status,
   });
+  final int index;
   final String title;
-  final String subtitle;
+  final String body;
+  final String date;
   final MedicineStatus status;
+
   @override
-  Widget build(BuildContext context) => AppCard(
-    radius: 12,
-    padding: const EdgeInsets.all(12),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-              Text(subtitle, style: Theme.of(context).textTheme.labelSmall),
-            ],
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 260 + index * 45),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 14 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: AppCard(
+        radius: 16,
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: statusColor(status).withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(statusIcon(status), color: statusColor(status)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 4),
+                  if (body.isNotEmpty)
+                    Text(
+                      body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  const SizedBox(height: 6),
+                  Text(
+                    date,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _StatusChip(status: status),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status});
+
+  final MedicineStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: statusColor(status),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        statusLabel(status),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationSkeleton extends StatelessWidget {
+  const _NotificationSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(
+        4,
+        (index) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: AppCard(
+            radius: 16,
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Container(
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        Icon(statusIcon(status), color: statusColor(status)),
-      ],
-    ),
-  );
+      ),
+    );
+  }
+}
+
+class _NotificationError extends StatelessWidget {
+  const _NotificationError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      radius: 16,
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.error, size: 44),
+          const SizedBox(height: 10),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 10),
+          FilledButton(onPressed: onRetry, child: const Text('Qayta urinish')),
+        ],
+      ),
+    );
+  }
 }
 
 class _NotificationEmpty extends StatelessWidget {
@@ -127,7 +309,7 @@ class _NotificationEmpty extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          AppStrings.of(context).notifications,
+          'Hozircha bildirishnoma yo‘q',
           style: Theme.of(context).textTheme.titleMedium,
         ),
       ],

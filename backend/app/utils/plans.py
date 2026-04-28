@@ -6,6 +6,7 @@ from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import Medicine, MedicineLog, MedicineSchedule
+from app.utils.timezone import tashkent_now
 
 DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 
@@ -50,7 +51,7 @@ def ensure_log(user_id: int, medicine_id: int, schedule_id: int, planned_at: dat
 
 def day_items(user_id: int, day: date, family_member_id: int | None = None, create_pending=False):
     items = []
-    now = datetime.utcnow()
+    now = tashkent_now()
     for schedule in schedules_for_day(user_id, day, family_member_id):
         planned_at = planned_datetime(day, schedule)
         log = log_for(user_id, schedule.id, planned_at)

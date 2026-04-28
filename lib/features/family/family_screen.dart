@@ -29,37 +29,22 @@ class _FamilyScreenState extends State<FamilyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text("Oila a'zolari"),
+        actions: [
+          IconButton(
+            onPressed: _showAddMemberSheet,
+            icon: const Icon(Icons.add_rounded),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Oila a'zolari",
-                        style: Theme.of(context).textTheme.headlineLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Dorilarni birgalikda nazorat qiling',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: _showAddMemberSheet,
-                  icon: const Icon(
-                    Icons.add,
-                    color: AppColors.primary,
-                    size: 30,
-                  ),
-                ),
-              ],
+            Text(
+              'Dorilarni birgalikda nazorat qiling',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 18),
             if (_loading)

@@ -122,10 +122,6 @@ class AppStrings {
   String get save => _pick('Saqlash', 'Save', 'Сохранить');
 
   String _pick(String uz, String en, String ru) {
-    return switch (language) {
-      AppLanguage.uz => uz,
-      AppLanguage.en => en,
-      AppLanguage.ru => ru,
-    };
+    return uz;
   }
 }

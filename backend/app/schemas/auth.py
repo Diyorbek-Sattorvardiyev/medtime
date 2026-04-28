@@ -9,6 +9,7 @@ class RegisterSchema(Schema):
     full_name = fields.Str(required=True, validate=validate.Length(min=2, max=120))
     email = fields.Email(required=True)
     password = fields.Str(required=True, validate=validate_password)
+    avatar_url = fields.Str(required=True, validate=validate.Length(min=1, max=500))
 
 
 class VerifyEmailSchema(Schema):

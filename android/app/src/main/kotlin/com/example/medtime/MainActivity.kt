@@ -1,9 +1,12 @@
 package com.example.medtime
 
 import android.content.Intent
+import android.os.Build
+import android.os.Bundle
 import android.net.Uri
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -11,6 +14,24 @@ import java.util.Locale
 
 class MainActivity : FlutterActivity() {
     private var tts: TextToSpeech? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        showOverLockScreenForAlarms()
+    }
+
+    private fun showOverLockScreenForAlarms() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

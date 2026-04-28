@@ -26,10 +26,16 @@ class AuthApi {
     required String fullName,
     required String email,
     required String password,
+    required String avatarUrl,
   }) async {
     final json = await _post(
       '/api/auth/register',
-      body: {'full_name': fullName, 'email': email, 'password': password},
+      body: {
+        'full_name': fullName,
+        'email': email,
+        'password': password,
+        'avatar_url': avatarUrl,
+      },
     );
     final data = _dataMap(json);
     return RegisterResult(

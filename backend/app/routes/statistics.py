@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint
@@ -11,6 +11,7 @@ from app.schemas.common import MessageSchema
 from app.schemas.medicine import StatisticsQuerySchema
 from app.utils.plans import summary_for_day
 from app.utils.responses import success
+from app.utils.timezone import tashkent_today
 
 blp = Blueprint("statistics", __name__, description="Statistika")
 
@@ -22,7 +23,7 @@ blp = Blueprint("statistics", __name__, description="Statistika")
 def statistics(query):
     user_id = int(get_jwt_identity())
     period = query["period"]
-    today = date.today()
+    today = tashkent_today()
     start_day = today - timedelta(days=period - 1)
     daily = []
     totals = Counter()

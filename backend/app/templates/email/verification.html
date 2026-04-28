@@ -1,3 +1,74 @@
-<p>Assalomu alaykum, {{ user.full_name }}.</p>
-<p>MedReminder kodi: <strong>{{ code }}</strong></p>
-<p>Kod 15 daqiqa amal qiladi.</p>
+<div style="margin:0;padding:0;background:#F8FAFC;font-family:Arial,Helvetica,sans-serif;color:#0F172A;">
+    <div style="max-width:560px;margin:0 auto;padding:28px 16px;">
+
+        <div style="background:linear-gradient(135deg,#22C55E,#3B82F6);border-radius:24px 24px 0 0;padding:30px;text-align:center;">
+            <div style="width:64px;height:64px;margin:0 auto 14px;background:#ffffff;border-radius:20px;display:inline-flex;align-items:center;justify-content:center;">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L4 5v6c0 5.2 3.4 9.8 8 11 4.6-1.2 8-5.8 8-11V5l-8-3z" fill="#22C55E"/>
+                    <path d="M9.5 12.2l1.6 1.6 3.8-4" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+
+            <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;">
+                MedReminder
+            </h1>
+
+            <p style="margin:8px 0 0;color:#DCFCE7;font-size:15px;">
+                Email tasdiqlash kodi
+            </p>
+        </div>
+
+        <div style="background:#ffffff;border:1px solid #E2E8F0;border-top:none;border-radius:0 0 24px 24px;padding:28px;box-shadow:0 12px 30px rgba(15,23,42,0.08);">
+
+            <p style="margin:0 0 18px;font-size:18px;line-height:1.6;color:#0F172A;">
+                Assalomu alaykum,
+                <strong>{{ user.full_name }}</strong>.
+            </p>
+
+            <p style="margin:0 0 22px;color:#64748B;font-size:15px;line-height:1.6;">
+                MedReminder hisobingizni tasdiqlash uchun quyidagi xavfsizlik kodidan foydalaning.
+            </p>
+
+            <div style="background:#DCFCE7;border:1px solid #86EFAC;border-radius:20px;padding:24px;text-align:center;margin-bottom:22px;">
+                <div style="margin-bottom:10px;">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                        <rect x="5" y="10" width="14" height="10" rx="2" fill="#22C55E"/>
+                        <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="#0F172A" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="12" cy="15" r="1.5" fill="#ffffff"/>
+                    </svg>
+                </div>
+
+                <p style="margin:0 0 10px;color:#166534;font-size:14px;font-weight:700;">
+                    Tasdiqlash kodi
+                </p>
+
+                <div style="display:inline-block;background:#ffffff;border:1px dashed #22C55E;border-radius:16px;padding:14px 24px;color:#0F172A;font-size:32px;font-weight:900;letter-spacing:6px;">
+                    {{ code }}
+                </div>
+            </div>
+
+            <div style="background:#FEF9C3;border:1px solid #FACC15;border-radius:18px;padding:18px;margin-bottom:22px;">
+                <div style="display:flex;align-items:center;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="margin-right:10px;flex-shrink:0;">
+                        <circle cx="12" cy="12" r="9" fill="#FACC15"/>
+                        <path d="M12 7v5l3 2" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+
+                    <p style="margin:0;color:#0F172A;font-size:15px;font-weight:700;">
+                        Kod 15 daqiqa amal qiladi.
+                    </p>
+                </div>
+            </div>
+
+            <p style="margin:0;text-align:center;color:#64748B;font-size:13px;line-height:1.6;">
+                Agar bu so‘rovni siz yubormagan bo‘lsangiz, ushbu xabarni e’tiborsiz qoldiring.
+            </p>
+
+        </div>
+
+        <p style="margin:18px 0 0;text-align:center;color:#64748B;font-size:12px;">
+            © MedReminder
+        </p>
+
+    </div>
+</div>

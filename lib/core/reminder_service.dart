@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'api_client.dart';
+import 'app_colors.dart';
 import 'auth_api.dart';
 import 'storage/offline_action_queue.dart';
 import 'utils/app_events.dart';
@@ -27,16 +28,14 @@ class ReminderService {
   final _plugin = FlutterLocalNotificationsPlugin();
   final _timers = <Timer>[];
   var _initialized = false;
+  var _syncInFlight = false;
+  String? _lastSyncSignature;
+  ReminderPayload? _pendingLaunchPayload;
 
   Future<void> initialize() async {
     if (_initialized) return;
     tz.initializeTimeZones();
-    try {
-      final timezone = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(timezone.identifier));
-    } catch (_) {
-      tz.setLocalLocation(tz.getLocation('Asia/Tashkent'));
-    }
+    tz.setLocalLocation(tz.getLocation('Asia/Tashkent'));
 
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     final ios = DarwinInitializationSettings(
@@ -63,6 +62,11 @@ class ReminderService {
       onDidReceiveNotificationResponse: _handleForegroundResponse,
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
+    final launchDetails = await _plugin.getNotificationAppLaunchDetails();
+    final launchResponse = launchDetails?.notificationResponse;
+    if (launchDetails?.didNotificationLaunchApp == true) {
+      _pendingLaunchPayload = ReminderPayload.tryParse(launchResponse?.payload);
+    }
 
     final androidPlugin = _plugin
         .resolvePlatformSpecificImplementation<
@@ -73,25 +77,42 @@ class ReminderService {
     _initialized = true;
   }
 
+  Future<void> showPendingLaunchReminder() async {
+    final payload = _pendingLaunchPayload;
+    if (payload == null) return;
+    _pendingLaunchPayload = null;
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    await showReminderDialog(payload);
+  }
+
   Future<void> syncFromMedicineMaps(
     List<Map<String, dynamic>> medicines,
   ) async {
+    final signature = _syncSignature(medicines);
+    if (_syncInFlight || signature == _lastSyncSignature) return;
+    _syncInFlight = true;
     await initialize();
-    await _plugin.cancelAll();
-    _clearTimers();
-    for (final medicine in medicines) {
-      await scheduleMedicine(medicine);
+    try {
+      await _plugin.cancelAll();
+      _clearTimers();
+      for (final medicine in medicines) {
+        await scheduleMedicine(medicine);
+      }
+      _lastSyncSignature = signature;
+    } finally {
+      _syncInFlight = false;
     }
   }
 
   Future<void> scheduleMedicine(Map<String, dynamic> medicine) async {
+    await initialize();
     final medicineId = _int(medicine['id'] ?? medicine['medicine_id']);
     if (medicineId == null || medicine['active'] == false) return;
 
     final schedules = _schedules(medicine);
     final start = _date(medicine['start_date']) ?? DateTime.now();
     final end = _date(medicine['end_date']);
-    final now = DateTime.now();
+    final now = _tashkentNow();
     var scheduledCount = 0;
     for (final schedule in schedules) {
       if (scheduledCount >= 40) break;
@@ -158,7 +179,7 @@ class ReminderService {
       title: 'Dori tugayapti',
       body: '$name zaxirasi kamaydi${stock.isEmpty ? '' : ': $stock qoldi'}',
       scheduledDate: tz.TZDateTime.from(
-        DateTime.now().add(const Duration(minutes: 1)),
+        _tashkentNow().add(const Duration(minutes: 1)),
         tz.local,
       ),
       notificationDetails: const NotificationDetails(
@@ -183,19 +204,44 @@ class ReminderService {
       scheduledDate: tz.TZDateTime.from(reminderAt, tz.local),
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          'medicine_reminders',
-          'Dori eslatmalari',
-          channelDescription: 'Dori qabul qilish vaqti kelganda ogohlantiradi',
+          'medicine_reminder_alarms',
+          'Dori budilniklari',
+          channelDescription:
+              'Dori qabul qilish vaqti kelganda budilnik kabi ogohlantiradi',
           importance: Importance.max,
+          channelBypassDnd: true,
           priority: Priority.max,
+          visibility: NotificationVisibility.public,
           category: AndroidNotificationCategory.alarm,
           fullScreenIntent: true,
           playSound: true,
           enableVibration: true,
+          vibrationPattern: Int64List.fromList([0, 700, 250, 700, 250, 900]),
+          audioAttributesUsage: AudioAttributesUsage.alarm,
+          color: AppColors.primary,
+          colorized: true,
+          showWhen: true,
+          autoCancel: false,
+          ticker: 'Dori vaqti',
           actions: const [
-            AndroidNotificationAction('taken', 'Ichdim'),
-            AndroidNotificationAction('snooze', 'Keyinroq'),
-            AndroidNotificationAction('missed', "O'tkazdim"),
+            AndroidNotificationAction(
+              'taken',
+              'Ichdim',
+              titleColor: AppColors.primary,
+              semanticAction: SemanticAction.markAsRead,
+            ),
+            AndroidNotificationAction(
+              'snooze',
+              'Keyin',
+              titleColor: AppColors.accent,
+              semanticAction: SemanticAction.archive,
+            ),
+            AndroidNotificationAction(
+              'missed',
+              "O'tkazdim",
+              titleColor: AppColors.error,
+              semanticAction: SemanticAction.delete,
+            ),
           ],
         ),
         iOS: const DarwinNotificationDetails(
@@ -210,7 +256,7 @@ class ReminderService {
   }
 
   void _scheduleInAppDialog(ReminderPayload payload, DateTime reminderAt) {
-    final delay = reminderAt.difference(DateTime.now());
+    final delay = reminderAt.difference(_tashkentNow());
     if (delay.isNegative || delay > const Duration(days: 1)) return;
     _timers.add(Timer(delay, () => showReminderDialog(payload)));
   }
@@ -223,32 +269,12 @@ class ReminderService {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Dori vaqti'),
-        content: Text('${payload.name} ${payload.dosage}\nQabul qildingizmi?'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await applyAction(payload, 'missed');
-            },
-            child: const Text("O'tkazdim"),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await applyAction(payload, 'snooze');
-            },
-            child: const Text('Keyinroq'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await applyAction(payload, 'taken');
-            },
-            child: const Text('Ichdim'),
-          ),
-        ],
+      builder: (context) => _ReminderAlarmDialog(
+        payload: payload,
+        onAction: (action) async {
+          Navigator.pop(context);
+          await applyAction(payload, action);
+        },
       ),
     );
   }
@@ -256,6 +282,7 @@ class ReminderService {
   Future<void> applyAction(ReminderPayload payload, String action) async {
     final api = ApiClient();
     try {
+      await _plugin.cancel(id: payload.notificationId);
       switch (action) {
         case 'taken':
           await api.markTaken(
@@ -276,7 +303,7 @@ class ReminderService {
             plannedAt: payload.plannedAt,
             minutes: 10,
           );
-          final next = DateTime.now().add(const Duration(minutes: 10));
+          final next = _tashkentNow().add(const Duration(minutes: 10));
           await _schedule(payload, next);
           _scheduleInAppDialog(payload, next);
       }
@@ -369,6 +396,28 @@ class ReminderService {
     _timers.clear();
   }
 
+  static String _syncSignature(List<Map<String, dynamic>> medicines) {
+    final parts = <String>[];
+    for (final medicine in medicines) {
+      final schedules = _schedules(medicine)
+          .map(
+            (schedule) =>
+                '${schedule['id'] ?? schedule['schedule_id']}:${schedule['time']}:'
+                '${(schedule['repeat_days'] as List? ?? const []).join(',')}:'
+                '${schedule['reminder_before_minutes']}',
+          )
+          .join('|');
+      parts.add(
+        '${medicine['id'] ?? medicine['medicine_id']}:${medicine['active']}:'
+        '${medicine['start_date']}:${medicine['end_date']}:'
+        '${medicine['refill_reminder_enabled']}:${medicine['refill_needed']}:'
+        '${medicine['stock_quantity']}:$schedules',
+      );
+    }
+    parts.sort();
+    return parts.join(';');
+  }
+
   static List<Map<String, dynamic>> _schedules(Map<String, dynamic> medicine) {
     final schedules = medicine['schedules'];
     if (schedules is List) {
@@ -410,6 +459,8 @@ class ReminderService {
       'SUN',
     ][date.weekday - 1];
   }
+
+  static DateTime _tashkentNow() => tz.TZDateTime.now(tz.local);
 }
 
 class ReminderPayload {
@@ -452,5 +503,160 @@ class ReminderPayload {
     } catch (_) {
       return null;
     }
+  }
+}
+
+class _ReminderAlarmDialog extends StatelessWidget {
+  const _ReminderAlarmDialog({required this.payload, required this.onAction});
+
+  final ReminderPayload payload;
+  final Future<void> Function(String action) onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: AppColors.floatingShadow,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.successSoft,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.medication_outlined,
+                    color: AppColors.primary,
+                    size: 25,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        payload.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Dosage: ${payload.dosage.isEmpty ? '-' : payload.dosage}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => onAction('snooze'),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _AlarmActionButton(
+                    label: 'Ichdim',
+                    icon: Icons.check_rounded,
+                    color: AppColors.primary,
+                    onTap: () => onAction('taken'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _AlarmActionButton(
+                    label: 'Keyin',
+                    icon: Icons.alarm_rounded,
+                    color: AppColors.accent,
+                    onTap: () => onAction('snooze'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _AlarmActionButton(
+                    label: "O'tkazdim",
+                    icon: Icons.close_rounded,
+                    color: AppColors.error,
+                    onTap: () => onAction('missed'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AlarmActionButton extends StatelessWidget {
+  const _AlarmActionButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(7),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(7),
+        onTap: onTap,
+        child: SizedBox(
+          height: 42,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 18),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

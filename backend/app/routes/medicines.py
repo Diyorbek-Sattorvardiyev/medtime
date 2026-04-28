@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import timedelta
 
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint
@@ -13,6 +13,7 @@ from app.schemas.medicine import MedicineActionSchema, MedicineBulkActionSchema,
 from app.utils.plans import DAYS, ensure_log, log_for, planned_datetime
 from app.utils.responses import error, success
 from app.utils.serializers import log_dict, medicine_dict
+from app.utils.timezone import tashkent_now, tashkent_today
 
 blp = Blueprint("medicines", __name__, description="Dorilar")
 
@@ -50,7 +51,7 @@ def replace_schedules(medicine: Medicine, schedules: list[dict]):
 def medicine_with_today_status(medicine: Medicine, today: date):
     data = medicine_dict(medicine)
     weekday = DAYS[today.weekday()]
-    now = datetime.utcnow()
+    now = tashkent_now()
     for schedule_data, schedule in zip(data.get("schedules", []), medicine.schedules):
         if weekday not in (schedule.repeat_days or []):
             continue
@@ -95,7 +96,7 @@ def list_medicines(query):
     if query.get("search"):
         q = q.filter(Medicine.name.ilike(f"%{query['search']}%"))
     items = q.order_by(Medicine.created_at.desc()).all()
-    today = date.today()
+    today = tashkent_today()
     return success({"medicines": [medicine_with_today_status(item, today) for item in items]}, "Dorilar ro'yxati")
 
 
@@ -174,7 +175,7 @@ def action_log(user_id: int, medicine_id: int, data: dict, status: str):
     log = ensure_log(user_id, medicine.id, schedule.id, data["planned_at"])
     log.status = status
     if status == "taken":
-        log.taken_at = datetime.utcnow()
+        log.taken_at = tashkent_now()
         log.snoozed_until = None
         if medicine.stock_quantity is not None and medicine.stock_quantity > 0:
             medicine.stock_quantity -= 1
@@ -182,7 +183,7 @@ def action_log(user_id: int, medicine_id: int, data: dict, status: str):
         log.taken_at = None
         log.snoozed_until = None
     elif status == "snoozed":
-        log.snoozed_until = datetime.utcnow() + timedelta(minutes=data["minutes"])
+        log.snoozed_until = tashkent_now() + timedelta(minutes=data["minutes"])
     db.session.commit()
     return log, None
 

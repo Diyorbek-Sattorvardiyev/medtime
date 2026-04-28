@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_colors.dart';
 import '../../core/app_routes.dart';
@@ -24,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   );
 
   final _api = AuthApi();
+  final _imagePicker = ImagePicker();
   late final _googleSignIn = GoogleSignIn(
     scopes: const ['email', 'profile'],
     serverClientId: _googleWebClientId.isEmpty ? null : _googleWebClientId,
@@ -39,6 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
   var _loading = false;
   String? _error;
   String? _pendingEmail;
+  String? _avatarPath;
 
   @override
   void dispose() {
@@ -67,195 +71,174 @@ class _LoginScreenState extends State<LoginScreen> {
     };
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.brandGradient),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(18, 26, 18, 18),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: AppColors.floatingShadow,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (!isLogin)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: IconButton(
-                          onPressed: _loading ? null : _showLogin,
-                          icon: const Icon(Icons.arrow_back),
-                        ),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 390),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!isLogin && !isRegister)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        onPressed: _loading ? null : _showLogin,
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded),
                       ),
-                    const _AuthIllustration(),
-                    const SizedBox(height: 16),
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(fontWeight: FontWeight.w900),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isRegister
-                          ? 'Yangi hisob yarating'
-                          : isVerify
-                          ? '${_pendingEmail ?? _emailController.text} emailiga kelgan kodni kiriting'
-                          : isForgot
-                          ? 'Emailingizga reset kod yuboramiz'
-                          : isReset
-                          ? 'Emaildagi kod bilan yangi parol kiriting'
-                          : 'Hisobingizga kiring',
-                      style: Theme.of(context).textTheme.bodyLarge,
+                  Text(
+                    isLogin || isRegister ? 'Login / Register' : title,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
                     ),
-                    const SizedBox(height: 18),
+                  ),
+                  const SizedBox(height: 28),
+                  if (isRegister) ...[
+                    _AvatarPicker(
+                      imagePath: _avatarPath,
+                      onCamera: () => _pickAvatar(ImageSource.camera),
+                      onGallery: () => _pickAvatar(ImageSource.gallery),
+                    ),
+                    const SizedBox(height: 12),
+                    _AuthField(
+                      controller: _fullNameController,
+                      label: 'Ism familiya',
+                      hint: 'Ism familiya',
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (!isVerify) ...[
+                    _AuthField(
+                      controller: _emailController,
+                      label: 'Email',
+                      hint: 'Email',
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (isVerify || isReset) ...[
+                    _AuthField(
+                      controller: _codeController,
+                      label: 'Kod',
+                      hint: '6 xonali kod',
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (isLogin || isRegister) ...[
+                    _AuthField(
+                      controller: _passwordController,
+                      label: 'Parol',
+                      hint: 'Parol',
+                      obscure: true,
+                      textInputAction: isRegister
+                          ? TextInputAction.next
+                          : TextInputAction.done,
+                    ),
                     if (isRegister) ...[
-                      _AuthField(
-                        controller: _fullNameController,
-                        label: 'Full name',
-                        hint: 'Full name',
-                        icon: Icons.person_outline,
-                        textInputAction: TextInputAction.next,
+                      const SizedBox(height: 6),
+                      Text(
+                        'Parol minimum 8 belgi bo‘lishi kerak',
+                        style: Theme.of(context).textTheme.labelSmall,
                       ),
                       const SizedBox(height: 12),
-                    ],
-                    if (!isVerify) ...[
                       _AuthField(
-                        controller: _emailController,
-                        label: 'Email',
-                        hint: 'Email kiriting',
-                        icon: Icons.mail_outline,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    if (isVerify || isReset) ...[
-                      _AuthField(
-                        controller: _codeController,
-                        label: 'Kod',
-                        hint: '6 xonali kod',
-                        icon: Icons.pin_outlined,
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    if (isLogin || isRegister) ...[
-                      _AuthField(
-                        controller: _passwordController,
-                        label: 'Password',
-                        hint: 'Password',
-                        icon: Icons.lock_outline,
-                        obscure: true,
-                        textInputAction: isRegister
-                            ? TextInputAction.next
-                            : TextInputAction.done,
-                      ),
-                      if (isRegister) ...[
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Password minimum 8 belgi bo‘lishi kerak',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        const SizedBox(height: 12),
-                        _AuthField(
-                          controller: _confirmPasswordController,
-                          label: 'Confirm password',
-                          hint: 'Confirm password',
-                          icon: Icons.lock_outline,
-                          obscure: true,
-                          textInputAction: TextInputAction.done,
-                        ),
-                      ],
-                    ],
-                    if (isReset) ...[
-                      _AuthField(
-                        controller: _newPasswordController,
-                        label: 'New password',
-                        hint: 'NewPassword123',
-                        icon: Icons.lock_reset_outlined,
+                        controller: _confirmPasswordController,
+                        label: 'Parolni tasdiqlash',
+                        hint: 'Parolni tasdiqlash',
                         obscure: true,
                         textInputAction: TextInputAction.done,
                       ),
                     ],
-                    if (isLogin)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _loading
-                              ? null
-                              : () => _switchMode(_AuthMode.forgot),
-                          child: const Text('Parolni unutdingizmi?'),
-                        ),
-                      ),
-                    const SizedBox(height: 14),
-                    AppButton(
-                      label: _loading
-                          ? 'Kuting...'
-                          : isForgot
-                          ? 'Kod yuborish'
-                          : isVerify
-                          ? 'Tasdiqlash'
-                          : isReset
-                          ? 'Parolni yangilash'
-                          : isRegister
-                          ? "Ro'yxatdan o'tish"
-                          : 'Kirish',
-                      onPressed: _loading ? null : _submit,
+                  ],
+                  if (isReset) ...[
+                    _AuthField(
+                      controller: _newPasswordController,
+                      label: 'Yangi parol',
+                      hint: 'Yangi parol',
+                      obscure: true,
+                      textInputAction: TextInputAction.done,
                     ),
-                    if (isVerify) ...[
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Kod 10 daqiqa ichida amal qiladi',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      TextButton(
-                        onPressed: _loading ? null : _resendCode,
-                        child: const Text('Kodni qayta yuborish'),
-                      ),
-                    ],
-                    if (_error != null) ...[
-                      const SizedBox(height: 12),
-                      _ErrorToast(message: _error!),
-                    ],
-                    if (isLogin) ...[
-                      const SizedBox(height: 18),
-                      Row(
-                        children: const [
-                          Expanded(child: Divider()),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: Text('yoki'),
-                          ),
-                          Expanded(child: Divider()),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      OutlinedButton.icon(
-                        onPressed: _loading ? null : _signInWithGoogle,
-                        icon: const Text(
-                          'G',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 20,
-                          ),
-                        ),
-                        label: const Text('Google'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 56),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                  ],
+                  if (isLogin) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _loading ? null : _signInWithGoogle,
+                      icon: const Text(
+                        'G',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 18),
+                      label: const Text('Google orqali kirish'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onSurface,
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _loading
+                            ? null
+                            : () => _switchMode(_AuthMode.forgot),
+                        child: const Text(
+                          'Parolni unutdingizmi?',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  AppButton(
+                    label: _loading
+                        ? 'Kuting...'
+                        : isForgot
+                        ? 'Kod yuborish'
+                        : isVerify
+                        ? 'Tasdiqlash'
+                        : isReset
+                        ? 'Parolni yangilash'
+                        : isRegister
+                        ? "Ro'yxatdan o'tish"
+                        : 'Kirish',
+                    onPressed: _loading ? null : _submit,
+                  ),
+                  if (isVerify) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Kod 10 daqiqa ichida amal qiladi',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                    TextButton(
+                      onPressed: _loading ? null : _resendCode,
+                      child: const Text('Kodni qayta yuborish'),
+                    ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    _ErrorToast(message: _error!),
+                  ],
+                  if (isLogin || isRegister) ...[
+                    const SizedBox(height: 14),
                     Center(
                       child: TextButton(
                         onPressed: _loading
@@ -267,13 +250,26 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                         child: Text(
                           isRegister
-                              ? 'Allaqachon hisobingiz bormi? Kirish'
+                              ? 'Hisobingiz bormi? Kirish'
                               : "Hisobingiz yo'qmi? Ro'yxatdan o'tish",
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
                     ),
                   ],
-                ),
+                  if (!isLogin && !isRegister && !isVerify) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      isForgot
+                          ? 'Emailingizga reset kod yuboramiz'
+                          : 'Emaildagi kod bilan yangi parol kiriting',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -298,6 +294,7 @@ class _LoginScreenState extends State<LoginScreen> {
           _openHome();
         case _AuthMode.register:
           _require(_fullNameController.text, 'Full name kiriting');
+          _require(_avatarPath ?? '', 'Profil rasmini yuklang');
           _require(_emailController.text, 'Email kiriting');
           _require(_passwordController.text, 'Password kiriting');
           _requirePassword(_passwordController.text);
@@ -309,6 +306,7 @@ class _LoginScreenState extends State<LoginScreen> {
               fullName: _fullNameController.text.trim(),
               email: _emailController.text.trim(),
               password: _passwordController.text,
+              avatarUrl: _avatarPath!,
             ),
           );
           _pendingEmail = _emailController.text.trim();
@@ -406,6 +404,19 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _pickAvatar(ImageSource source) async {
+    final picked = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 78,
+      maxWidth: 1200,
+    );
+    if (picked == null) return;
+    setState(() {
+      _avatarPath = picked.path;
+      _error = null;
+    });
+  }
+
   Future<T> _run<T>(Future<T> Function() action) async {
     setState(() => _loading = true);
     try {
@@ -459,48 +470,83 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _AuthIllustration extends StatelessWidget {
-  const _AuthIllustration();
+class _AvatarPicker extends StatelessWidget {
+  const _AvatarPicker({
+    required this.imagePath,
+    required this.onCamera,
+    required this.onGallery,
+  });
+
+  final String? imagePath;
+  final VoidCallback onCamera;
+  final VoidCallback onGallery;
+
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 130,
-    child: Stack(
-      alignment: Alignment.center,
-      children: [
-        Container(
-          width: 110,
-          height: 110,
-          decoration: const BoxDecoration(
-            color: Color(0xFFE4F7ED),
-            shape: BoxShape.circle,
+  Widget build(BuildContext context) {
+    final path = imagePath;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.successSoft.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 34,
+            backgroundColor: Colors.white,
+            backgroundImage: path == null || path.isEmpty
+                ? null
+                : FileImage(File(path)),
+            child: path == null || path.isEmpty
+                ? const Icon(
+                    Icons.person_add_alt_1_outlined,
+                    color: AppColors.primary,
+                    size: 30,
+                  )
+                : null,
           ),
-        ),
-        const Icon(
-          Icons.health_and_safety_outlined,
-          color: AppColors.primary,
-          size: 70,
-        ),
-        const Positioned(
-          left: 72,
-          bottom: 18,
-          child: Icon(
-            Icons.medication_outlined,
-            color: AppColors.secondary,
-            size: 36,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Profil rasmi',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Ro‘yxatdan o‘tish uchun majburiy',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ActionChip(
+                      avatar: const Icon(Icons.photo_camera_outlined, size: 16),
+                      label: const Text('Kamera'),
+                      onPressed: onCamera,
+                    ),
+                    ActionChip(
+                      avatar: const Icon(
+                        Icons.photo_library_outlined,
+                        size: 16,
+                      ),
+                      label: const Text('Galereya'),
+                      onPressed: onGallery,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        Positioned(
-          right: 72,
-          bottom: 18,
-          child: Icon(
-            Icons.account_circle_outlined,
-            color: Theme.of(context).colorScheme.onSurface,
-            size: 42,
-          ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _AuthField extends StatefulWidget {
@@ -508,7 +554,6 @@ class _AuthField extends StatefulWidget {
     required this.controller,
     required this.label,
     required this.hint,
-    this.icon,
     this.obscure = false,
     this.keyboardType,
     this.textInputAction,
@@ -516,7 +561,6 @@ class _AuthField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final String hint;
-  final IconData? icon;
   final bool obscure;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
@@ -540,7 +584,6 @@ class _AuthFieldState extends State<_AuthField> {
         keyboardType: widget.keyboardType,
         textInputAction: widget.textInputAction,
         decoration: InputDecoration(
-          prefixIcon: widget.icon == null ? null : Icon(widget.icon, size: 20),
           suffixIcon: widget.obscure
               ? IconButton(
                   onPressed: () => setState(() => _obscured = !_obscured),

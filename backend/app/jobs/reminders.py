@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.extensions import db, scheduler
 from app.models import Medicine, MedicineSchedule, NotificationLog
 from app.services.email import send_reminder_email
 from app.services.telegram import send_telegram_message
 from app.utils.plans import DAYS, planned_datetime
+from app.utils.timezone import tashkent_now
 
 
 def register_scheduler_jobs(app):
@@ -18,7 +19,7 @@ def register_scheduler_jobs(app):
 
 def send_due_reminders(app):
     with app.app_context():
-        now = datetime.utcnow().replace(second=0, microsecond=0)
+        now = tashkent_now().replace(second=0, microsecond=0)
         today = now.date()
         weekday = DAYS[today.weekday()]
         schedules = (

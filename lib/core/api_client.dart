@@ -282,6 +282,14 @@ class ApiClient {
     return _request('GET', '/api/telegram/connect-link').then(_dataMap);
   }
 
+  Future<Map<String, dynamic>> getTelegramConnectStatus(String code) {
+    return _request(
+      'GET',
+      '/api/telegram/connect-status',
+      query: {'code': code},
+    ).then(_dataMap);
+  }
+
   Future<void> disconnectTelegram() async {
     await _request('DELETE', '/api/telegram/disconnect');
   }

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
-
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint
 
@@ -12,6 +10,7 @@ from app.schemas.family import FamilyMemberSchema, FamilyMemberUpdateSchema
 from app.utils.plans import summary_for_day
 from app.utils.responses import error, success
 from app.utils.serializers import family_dict, medicine_dict, schedule_dict
+from app.utils.timezone import tashkent_today
 
 blp = Blueprint("family", __name__, description="Oila a'zolari")
 
@@ -21,7 +20,7 @@ def owned_member_or_404(member_id: int, user_id: int):
 
 
 def member_summary(user_id: int, member_id: int):
-    counts, items = summary_for_day(user_id, date.today(), member_id)
+    counts, items = summary_for_day(user_id, tashkent_today(), member_id)
     counts["today_medicines"] = [
         {
             **medicine_dict(item["medicine"], include_schedules=False),

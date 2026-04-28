@@ -13,6 +13,7 @@ class Medicine(db.Model):
     family_member_id = db.Column(db.Integer, db.ForeignKey("family_members.id", ondelete="SET NULL"), nullable=True, index=True)
     name = db.Column(db.String(160), nullable=False)
     dosage = db.Column(db.String(120), nullable=False)
+    image_url = db.Column(db.String(500), nullable=True)
     intake_type = db.Column(db.String(32), nullable=False)
     notes = db.Column(db.Text, nullable=True)
     stock_quantity = db.Column(db.Integer, nullable=True)
