@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
+
 from flask import Flask
+from flask import send_from_directory
 from marshmallow import ValidationError
 from sqlalchemy import text
 
@@ -50,7 +53,30 @@ def create_app(config_object=Config):
         db.session.execute(text("SELECT 1"))
         return success({"status": "up"}, "Server ishlayapti")
 
+    register_admin_panel(app)
+
     return app
+
+
+def register_admin_panel(app):
+    admin_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "admin-panel", "dist"))
+
+    @app.get("/")
+    def admin_index():
+        if os.path.exists(os.path.join(admin_dist, "index.html")):
+            return send_from_directory(admin_dist, "index.html")
+        return success({"status": "up"}, "Server ishlayapti")
+
+    @app.get("/<path:path>")
+    def admin_static(path):
+        if path.startswith(("api/", "docs", "openapi")):
+            return error("Resurs topilmadi", status_code=404)
+        file_path = os.path.join(admin_dist, path)
+        if os.path.isfile(file_path):
+            return send_from_directory(admin_dist, path)
+        if os.path.exists(os.path.join(admin_dist, "index.html")):
+            return send_from_directory(admin_dist, "index.html")
+        return error("Admin panel build qilinmagan", status_code=404)
 
 
 def register_blueprints():
