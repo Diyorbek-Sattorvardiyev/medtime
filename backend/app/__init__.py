@@ -6,6 +6,7 @@ from flask import Flask
 from flask import send_from_directory
 from marshmallow import ValidationError
 from sqlalchemy import text
+from werkzeug.exceptions import HTTPException
 
 from app.config import Config
 from app.extensions import api, cors, db, jwt, limiter, mail, migrate, scheduler
@@ -105,6 +106,10 @@ def register_error_handlers(app):
     @app.errorhandler(500)
     def handle_server_error(_err):
         return error("Serverda ichki xatolik", status_code=500)
+
+    @app.errorhandler(HTTPException)
+    def handle_http_error(err):
+        return error(err.description or "HTTP xatolik", status_code=err.code or 500)
 
 
 def register_jwt_handlers():

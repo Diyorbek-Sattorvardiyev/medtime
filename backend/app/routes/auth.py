@@ -29,11 +29,8 @@ def register(data):
     user = User(full_name=data["full_name"], email=data["email"].lower(), password_hash=hash_password(data["password"]), avatar_url=data["avatar_url"])
     db.session.add(user)
     db.session.commit()
-    code = create_email_code(user, "register")
-    payload = {"user_id": user.id}
-    if current_app.config["RETURN_VERIFICATION_CODE"]:
-        payload["verification_code"] = code
-    return success(payload, "Ro'yxatdan o'tdingiz. Email tasdiqlash kodi yuborildi", 201)
+    create_email_code(user, "register")
+    return success({"user_id": user.id}, "Ro'yxatdan o'tdingiz. Email tasdiqlash kodi yuborildi", 201)
 
 
 @blp.route("/verify-email", methods=["POST"])
@@ -61,11 +58,8 @@ def resend_code(data):
     user = User.query.filter_by(email=data["email"].lower()).first()
     if not user:
         return error("Foydalanuvchi topilmadi", status_code=404)
-    code = create_email_code(user, "register")
-    payload = {}
-    if current_app.config["RETURN_VERIFICATION_CODE"]:
-        payload["verification_code"] = code
-    return success(payload, "Tasdiqlash kodi qayta yuborildi")
+    create_email_code(user, "register")
+    return success({}, "Tasdiqlash kodi qayta yuborildi")
 
 
 @blp.route("/login", methods=["POST"])
@@ -134,13 +128,9 @@ def logout():
 @limiter.limit("3 per minute")
 def forgot_password(data):
     user = User.query.filter_by(email=data["email"].lower()).first()
-    payload = {}
     if user:
-        code = create_email_code(user, "forgot_password")
-        if current_app.config["RETURN_VERIFICATION_CODE"]:
-            payload["verification_code"] = code
-            payload["code"] = code
-    return success(payload, "Agar email mavjud bo'lsa, parol tiklash kodi yuborildi")
+        create_email_code(user, "forgot_password")
+    return success({}, "Agar email mavjud bo'lsa, parol tiklash kodi yuborildi")
 
 
 @blp.route("/reset-password", methods=["POST"])
