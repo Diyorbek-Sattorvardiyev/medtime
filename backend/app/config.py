@@ -36,6 +36,10 @@ class Config:
 
     RETURN_VERIFICATION_CODE = os.getenv("RETURN_VERIFICATION_CODE", "false").lower() == "true"
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+    ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@shifonazorat.uz")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin12345")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
     TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "shifonazoratbot")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")

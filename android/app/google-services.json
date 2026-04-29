@@ -20,6 +20,10 @@
             "package_name": "com.example.medtime",
             "certificate_hash": "985891acb2b381e9ce804ee3a25256bb4c6ce783"
           }
+        },
+        {
+          "client_id": "896703375462-bvnc0i8lerl9cp2efl8nphdphvvlvdf4.apps.googleusercontent.com",
+          "client_type": 3
         }
       ],
       "api_key": [
@@ -29,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "896703375462-bvnc0i8lerl9cp2efl8nphdphvvlvdf4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

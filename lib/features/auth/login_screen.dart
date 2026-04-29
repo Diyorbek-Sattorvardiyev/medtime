@@ -19,18 +19,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const _googleWebClientId = String.fromEnvironment(
-    'GOOGLE_WEB_CLIENT_ID',
-    defaultValue:
-        '896703375462-bvnc0i8lerl9cp2efl8nphdphvvlvdf4.apps.googleusercontent.com',
-  );
-
   final _api = AuthApi();
   final _imagePicker = ImagePicker();
-  late final _googleSignIn = GoogleSignIn(
-    scopes: const ['email', 'profile'],
-    serverClientId: _googleWebClientId.isEmpty ? null : _googleWebClientId,
-  );
+  late final _googleSignIn = GoogleSignIn(scopes: const ['email', 'profile']);
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -369,7 +360,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _signInWithGoogle() async {
     try {
       setState(() => _error = null);
-      debugPrint('Google sign-in serverClientId=$_googleWebClientId');
+      debugPrint(
+        'Google sign-in uses default_web_client_id from google-services.json.',
+      );
       final account = await _googleSignIn.signIn();
       if (account == null) {
         debugPrint('Google sign-in cancelled by user.');
@@ -380,7 +373,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (idToken == null || idToken.isEmpty) {
         debugPrint(
           'Google sign-in failed: idToken is empty. '
-          'serverClientId=$_googleWebClientId',
+          'Check default_web_client_id generated from google-services.json.',
         );
         throw const AuthApiException(
           'Google id_token olinmadi. Android OAuth client va webClientId sozlamalarini tekshiring.',

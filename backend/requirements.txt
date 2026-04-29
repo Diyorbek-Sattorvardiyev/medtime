@@ -12,4 +12,5 @@ google-auth==2.34.0
 gunicorn==22.0.0
 marshmallow==3.21.3
 python-dotenv==1.0.1
+psycopg2-binary==2.9.9
 requests==2.32.3

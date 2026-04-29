@@ -10,8 +10,8 @@ class AuthApi {
       _baseUrl = (baseUrl ?? defaultBaseUrl).replaceFirst(RegExp(r'/$'), '');
 
   static const defaultBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.70.19.11:5000',
+    'https://medtime-u0es.onrender.com',
+    defaultValue: 'https://medtime-u0es.onrender.com',
   );
 
   static const _secureStorage = FlutterSecureStorage();

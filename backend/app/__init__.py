@@ -7,6 +7,7 @@ from sqlalchemy import text
 from app.config import Config
 from app.extensions import api, cors, db, jwt, limiter, mail, migrate, scheduler
 from app.jobs.reminders import register_scheduler_jobs
+from app.routes.admin import blp as admin_blp
 from app.routes.auth import blp as auth_blp
 from app.routes.calendar import blp as calendar_blp
 from app.routes.dashboard import blp as dashboard_blp
@@ -53,6 +54,7 @@ def create_app(config_object=Config):
 
 
 def register_blueprints():
+    api.register_blueprint(admin_blp, url_prefix="/api/admin")
     api.register_blueprint(auth_blp, url_prefix="/api/auth")
     api.register_blueprint(profile_blp, url_prefix="/api/profile")
     api.register_blueprint(family_blp, url_prefix="/api/family-members")
@@ -91,4 +93,3 @@ def register_jwt_handlers():
     @jwt.unauthorized_loader
     def missing_token_callback(reason):
         return error("Token yuborilmagan", {"reason": reason}, 401)
-
