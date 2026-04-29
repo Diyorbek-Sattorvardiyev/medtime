@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { AdminUser, AiStatus, DashboardData, Medicine, MessageLog, Paginated, User } from '../types/api';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://medtime-u0es.onrender.com',
   headers: { 'Content-Type': 'application/json' },
 });
 

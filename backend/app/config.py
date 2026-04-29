@@ -33,8 +33,9 @@ class Config:
     MAIL_USERNAME = os.getenv("MAIL_USERNAME")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
+    MAIL_TIMEOUT = int(os.getenv("MAIL_TIMEOUT", "8"))
 
-    RETURN_VERIFICATION_CODE = False
+    RETURN_VERIFICATION_CODE = os.getenv("RETURN_VERIFICATION_CODE", "false").lower() == "true"
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@shifonazorat.uz")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin12345")
