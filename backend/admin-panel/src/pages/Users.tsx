@@ -1,4 +1,4 @@
-import { Download, UserPlus, Users as UsersIcon } from 'lucide-react';
+import { Download, Trash2, UserPlus, Users as UsersIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { EmptyState, ErrorState, LoadingState, PageHeader, Pagination, StatCard, StatusBadge } from '../components/Common';
 import { usersApi } from '../services/api';
@@ -12,6 +12,7 @@ export function Users() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -32,6 +33,22 @@ export function Users() {
   const toggle = async (user: User) => {
     await usersApi.status(user.id, user.status === 'active' ? 'blocked' : 'active');
     load();
+  };
+
+  const remove = async (user: User) => {
+    const confirmed = window.confirm(
+      `${user.full_name} foydalanuvchisini o'chirasizmi? Unga tegishli dorilar, eslatmalar, kodlar va xabarlar ham o'chiriladi.`,
+    );
+    if (!confirmed) return;
+    setDeletingId(user.id);
+    try {
+      await usersApi.remove(user.id);
+      await load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (loading && !data) return <LoadingState />;
@@ -112,9 +129,15 @@ export function Users() {
                     <StatusBadge status={user.status} />
                   </td>
                   <td>
-                    <button className="link-btn" onClick={() => toggle(user)}>
-                      {user.status === 'active' ? 'Bloklash' : 'Faollashtirish'}
-                    </button>
+                    <div className="row-actions">
+                      <button className="link-btn" onClick={() => toggle(user)}>
+                        {user.status === 'active' ? 'Bloklash' : 'Faollashtirish'}
+                      </button>
+                      <button className="link-btn danger" disabled={deletingId === user.id} onClick={() => remove(user)}>
+                        <Trash2 size={16} />
+                        {deletingId === user.id ? "O'chirilmoqda" : "O'chirish"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

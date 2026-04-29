@@ -103,6 +103,10 @@ def register_error_handlers(app):
     def handle_not_found(_err):
         return error("Resurs topilmadi", status_code=404)
 
+    @app.errorhandler(429)
+    def handle_rate_limit(_err):
+        return error("Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring", status_code=429)
+
     @app.errorhandler(500)
     def handle_server_error(_err):
         return error("Serverda ichki xatolik", status_code=500)

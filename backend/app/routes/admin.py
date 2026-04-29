@@ -12,7 +12,16 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.extensions import db
-from app.models import Medicine, MedicineLog, MedicineSchedule, NotificationLog, User
+from app.models import (
+    EmailVerificationCode,
+    Medicine,
+    MedicineLog,
+    MedicineSchedule,
+    NotificationLog,
+    RefreshToken,
+    TelegramConnectCode,
+    User,
+)
 from app.services.email import send_mail_safe
 from app.utils.responses import error, success
 
@@ -247,6 +256,11 @@ def delete_user(user_id):
     if guard:
         return guard
     user = User.query.get_or_404(user_id)
+    NotificationLog.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    MedicineLog.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    TelegramConnectCode.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    RefreshToken.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    EmailVerificationCode.query.filter_by(user_id=user.id).delete(synchronize_session=False)
     db.session.delete(user)
     db.session.commit()
     return success({"id": user_id}, "Foydalanuvchi o'chirildi")

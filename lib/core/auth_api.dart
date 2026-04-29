@@ -165,9 +165,7 @@ class AuthApi {
         body: body == null ? null : jsonEncode(body),
       );
 
-      final decoded = response.body.isEmpty
-          ? <String, dynamic>{}
-          : jsonDecode(response.body) as Map<String, dynamic>;
+      final decoded = _decodeResponse(response);
       final success = decoded['success'] != false && response.statusCode < 400;
       if (!success) {
         throw AuthApiException(
@@ -189,8 +187,29 @@ class AuthApi {
         'Serverga ulanishda xatolik: ${error.message}',
         kind: AuthApiErrorKind.server,
       );
+    }
+  }
+
+  static Map<String, dynamic> _decodeResponse(http.Response response) {
+    if (response.body.isEmpty) return <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      throw const FormatException('JSON object expected');
     } on FormatException {
-      throw const AuthApiException('Server notogri JSON response qaytardi');
+      final preview = response.body
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      final shortPreview = preview.length > 140
+          ? '${preview.substring(0, 140)}...'
+          : preview;
+      throw AuthApiException(
+        'Server JSON emas javob qaytardi (${response.statusCode}): $shortPreview',
+        statusCode: response.statusCode,
+        kind: response.statusCode >= 500
+            ? AuthApiErrorKind.server
+            : AuthApiErrorKind.unknown,
+      );
     }
   }
 

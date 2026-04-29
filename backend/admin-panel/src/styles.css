@@ -301,6 +301,21 @@ button {
   padding: 0;
 }
 
+.link-btn.danger {
+  color: #c81e3a;
+}
+
+.link-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .stats {
   display: grid;
   gap: 24px;
